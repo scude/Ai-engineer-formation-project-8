@@ -1,0 +1,31 @@
+# Données
+data/
+mlruns/
+logs/
+
+# Notebooks
+.ipynb_checkpoints/
+artifacts/
+notebook/artifacts/
+# Environnements / sauvegardes
+.env
+*.bak
+*:Zone.Identifier
+*Zone.Identifier
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE / éditeurs
+.idea/
+.vscode/
+
+# Modèles & artefacts
+embeddings/
+
+# Fichiers temporaires divers
+*.log
+*.tmp
