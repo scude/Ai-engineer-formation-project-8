@@ -68,7 +68,12 @@ def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: boo
 
     ds = tf.data.Dataset.from_tensor_slices((xs, ys))
     if training:
+        if cfg.max_train_samples is not None:
+            ds = ds.take(cfg.max_train_samples)
         ds = ds.shuffle(len(xs), seed=cfg.seed, reshuffle_each_iteration=True)
+    else:
+        if cfg.max_val_samples is not None:
+            ds = ds.take(cfg.max_val_samples)
     ds = ds.map(_parse, num_parallel_calls=AUTOTUNE)
     ds = ds.batch(cfg.batch_size).prefetch(AUTOTUNE)
     return ds

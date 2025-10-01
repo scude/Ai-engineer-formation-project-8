@@ -75,23 +75,21 @@ def train(model_name: str = "deeplab_resnet50",
     # MLflow
     init_mlflow(train_cfg.exp_name)
     run = start_run(run_name=f"{model_name}")
+    max_train_samples = getattr(train_cfg, "max_train_samples", None)
+    max_val_samples = getattr(train_cfg, "max_val_samples", None)
     mlf_logger = KerasMlflowLogger({
         "model": model_name, "height": data_cfg.height, "width": data_cfg.width,
         "batch_size": data_cfg.batch_size, "lr": train_cfg.lr, "epochs": train_cfg.epochs,
         "optimizer": train_cfg.optimizer, "aug": vars(aug_cfg), "ignore_index": data_cfg.ignore_index
-    })
-    mlf_logger.on_train_begin()
+    }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
 
-    callbacks = [
-        keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(ckpt_dir, "weights.{epoch:03d}-{val_masked_mIoU:.4f}.keras"),
-            monitor="val_masked_mIoU", mode="max", save_best_only=True
-        ),
-        keras.callbacks.EarlyStopping(monitor="val_masked_mIoU", mode="max",
-                                      patience=train_cfg.early_stop_patience, restore_best_weights=True),
+    callbacks = [keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(ckpt_dir, "weights.{epoch:03d}-{val_masked_mIoU:.4f}.keras"),
+        monitor="val_masked_mIoU", mode="max", save_best_only=True
+    ), keras.callbacks.EarlyStopping(monitor="val_masked_mIoU", mode="max",
+                                     patience=train_cfg.early_stop_patience, restore_best_weights=True),
         keras.callbacks.TerminateOnNaN(),
-        keras.callbacks.CSVLogger(os.path.join(train_cfg.output_dir, "train_log.csv"))
-    ]
+        keras.callbacks.CSVLogger(os.path.join(train_cfg.output_dir, "train_log.csv")), mlf_logger]
 
     hist = model.fit(train_ds, validation_data=val_ds, epochs=train_cfg.epochs, callbacks=callbacks, verbose=1)
 
@@ -131,6 +129,8 @@ if __name__ == "__main__":
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--width", type=int, default=1024)
     p.add_argument("--batch_size", type=int, default=2)
+    p.add_argument("--max_train_samples", type=int, default=None)
+    p.add_argument("--max_val_samples", type=int, default=None)
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--optimizer", default="adam", choices=["adam","adamw","sgd"])
@@ -153,7 +153,9 @@ if __name__ == "__main__":
 
     data_cfg = DataConfig(
         data_root=args.data_root, height=args.height, width=args.width,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        max_train_samples=args.max_train_samples,
+        max_val_samples=args.max_val_samples
     )
     train_cfg = TrainConfig(lr=args.lr, epochs=args.epochs, optimizer=args.optimizer)
     aug_cfg = AugmentConfig(

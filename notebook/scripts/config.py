@@ -16,6 +16,8 @@ class DataConfig:
     seed: int = 1337
     batch_size: int = 2
     autotune: Optional[int] = None  # tf.data.AUTOTUNE set in code
+    max_train_samples: Optional[int] = None
+    max_val_samples: Optional[int] = None
 
 @dataclass
 class TrainConfig:
