@@ -44,8 +44,8 @@ def deeplab_resnet50(input_shape, num_classes, output_stride=16, imagenet=True):
         x = layers.SeparableConv2D(256, 3, padding="same", use_bias=False)(x)
         x = layers.BatchNormalization()(x); x = layers.ReLU()(x)
 
-    x = layers.Resizing(input_shape[0], input_shape[1], interpolation="bilinear")(x)
     logits = layers.Conv2D(num_classes, 1, name="logits")(x)
+    logits = layers.Resizing(input_shape[0], input_shape[1], interpolation="bilinear")(logits)
     return keras.Model(base.input, logits, name="deeplabv3plus_resnet50")
 
 def deeplab_mobilenetv2(input_shape, num_classes, imagenet=True):
@@ -66,8 +66,8 @@ def deeplab_mobilenetv2(input_shape, num_classes, imagenet=True):
         x = layers.SeparableConv2D(128, 3, padding="same", use_bias=False)(x)
         x = layers.BatchNormalization()(x); x = layers.ReLU()(x)
 
-    x = layers.Resizing(input_shape[0], input_shape[1], interpolation="bilinear")(x)
     logits = layers.Conv2D(num_classes, 1, name="logits")(x)
+    logits = layers.Resizing(input_shape[0], input_shape[1], interpolation="bilinear")(logits)
     return keras.Model(base.input, logits, name="deeplabv3plus_mobilenetv2")
 
 def unet_small(input_shape, num_classes, base_filters=32):
