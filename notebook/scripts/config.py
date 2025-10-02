@@ -30,19 +30,37 @@ class TrainConfig:
 
 @dataclass
 class AugmentConfig:
+    """Configuration for the Albumentations-based augmentation pipeline.
+
+    The geometric parameters are converted to Albumentations transforms:
+
+    * ``random_rotate_deg`` becomes the symmetric degree range passed to
+      :class:`albumentations.Rotate` (``[-deg, +deg]``).
+    * ``random_scale_min`` and ``random_scale_max`` are multiplicative factors
+      consumed by :class:`~notebook.scripts.augment.RandomScaleCrop` to mimic
+      the former TensorFlow resize/scale/crop pipeline.
+
+    Photometric parameters map to :class:`albumentations.ColorJitter`. The
+    ``*_delta`` values follow the PyTorch-style semantics used by
+    Albumentations: a value of ``d`` yields multiplicative factors drawn from
+    ``[max(0, 1 - d), 1 + d]``. ``gaussian_noise_std`` represents the desired
+    standard deviation in the ``[0, 1]`` range and is converted to a variance
+    interval for :class:`albumentations.GaussNoise`.
+    """
+
     # geometric
     hflip: bool = True
     vflip: bool = False
-    random_rotate_deg: float = 0.0     # e.g., 5.0
-    random_scale_min: float = 1.0      # e.g., 0.75
-    random_scale_max: float = 1.0      # e.g., 1.25
-    random_crop: bool = False          # if True, do scale+crop to (H,W)
+    random_rotate_deg: float = 0.0     # rotation amplitude in degrees (symmetric)
+    random_scale_min: float = 1.0      # multiplicative lower bound for scaling
+    random_scale_max: float = 1.0      # multiplicative upper bound for scaling
+    random_crop: bool = False          # if True, enable random scale+crop to (H,W)
     # photometric (image-only)
-    brightness_delta: float = 0.0      # e.g., 0.1
-    contrast_delta: float = 0.0        # e.g., 0.1
-    saturation_delta: float = 0.0      # e.g., 0.1
-    hue_delta: float = 0.0             # e.g., 0.02
-    gaussian_noise_std: float = 0.0    # e.g., 0.01
+    brightness_delta: float = 0.0      # ColorJitter brightness factor delta
+    contrast_delta: float = 0.0        # ColorJitter contrast factor delta
+    saturation_delta: float = 0.0      # ColorJitter saturation factor delta
+    hue_delta: float = 0.0             # ColorJitter hue factor delta (0..0.5)
+    gaussian_noise_std: float = 0.0    # standard deviation of additive Gaussian noise in [0,1]
     # enable/disable all aug
     enabled: bool = True
 

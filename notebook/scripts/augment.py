@@ -1,138 +1,157 @@
 # /scripts/augment.py
-import tensorflow as tf
 from typing import Tuple
+
+import albumentations as A
+import cv2
+import numpy as np
+import tensorflow as tf
+
 from .config import AugmentConfig
 
-# ---------- helpers sûrs 3D <-> 4D ----------
-def _resize_3d(img3: tf.Tensor, size, method="bilinear") -> tf.Tensor:
-    img4 = tf.expand_dims(img3, 0)                    # [1,H,W,C]
-    out4 = tf.image.resize(img4, size, method=method) # [1,h,w,C]
-    return tf.squeeze(out4, 0)                        # [h,w,C]
 
-def _crop_to_box_3d(img3: tf.Tensor, offset_h, offset_w, target_h, target_w) -> tf.Tensor:
-    img4 = tf.expand_dims(img3, 0)  # [1,H,W,C]
-    out4 = tf.image.crop_to_bounding_box(img4, offset_h, offset_w, target_h, target_w)
-    return tf.squeeze(out4, 0)      # [h,w,C]
+class RandomScaleCrop(A.DualTransform):
+    """Albumentations transform mimicking the TF random scale+crop pipeline."""
 
-# ---------- rotation (sans TFA) ----------
-def _rotate_3d(img3: tf.Tensor, angle_rad: tf.Tensor, method: str) -> tf.Tensor:
-    """
-    Rotation autour du centre via ImageProjectiveTransformV3 (op natif TF).
-    img3: [H,W,C] float32
-    angle_rad: scalaire radians
-    method: "bilinear" ou "nearest"
-    """
-    h = tf.cast(tf.shape(img3)[0], tf.float32)
-    w = tf.cast(tf.shape(img3)[1], tf.float32)
-    cy = (h - 1.0) / 2.0
-    cx = (w - 1.0) / 2.0
+    def __init__(
+        self,
+        scale_min: float,
+        scale_max: float,
+        target_height: int,
+        target_width: int,
+        always_apply: bool = False,
+        p: float = 1.0,
+    ) -> None:
+        super().__init__(always_apply=always_apply, p=p)
+        self.scale_min = scale_min
+        self.scale_max = scale_max
+        self.target_height = target_height
+        self.target_width = target_width
 
-    c = tf.cos(angle_rad)
-    s = tf.sin(angle_rad)
+    def apply(self, image, scale=1.0, nh=0, nw=0, top=0, left=0, **params):
+        return self._apply(image, scale, nh, nw, top, left, cv2.INTER_LINEAR)
 
-    # matrice qui mappe (x_out, y_out) -> (x_in, y_in)
-    # x' = c*x - s*y + tx
-    # y' = s*x + c*y + ty
-    tx = (1.0 - c) * cx + s * cy
-    ty = (1.0 - c) * cy - s * cx
+    def apply_to_mask(self, mask, scale=1.0, nh=0, nw=0, top=0, left=0, **params):
+        return self._apply(mask, scale, nh, nw, top, left, cv2.INTER_NEAREST)
 
-    # TF attend [a0, a1, a2, a3, a4, a5, a6, a7] (a6=a7=0 pour affine)
-    transform = tf.stack([c, -s, tx, s, c, ty, 0.0, 0.0], axis=0)
-    transform = tf.expand_dims(transform, 0)  # [1,8]
+    def _apply(self, arr, scale, nh, nw, top, left, interpolation):
+        resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
+        bottom = min(top + self.target_height, nh)
+        right = min(left + self.target_width, nw)
+        cropped = resized[top:bottom, left:right]
+        if cropped.shape[0] != self.target_height or cropped.shape[1] != self.target_width:
+            cropped = cv2.resize(
+                cropped,
+                (self.target_width, self.target_height),
+                interpolation=interpolation,
+            )
+        return cropped
 
-    img4 = tf.expand_dims(img3, 0)  # [1,H,W,C]
-    out4 = tf.raw_ops.ImageProjectiveTransformV3(
-        images=img4,
-        transforms=transform,
-        output_shape=tf.stack([tf.cast(h, tf.int32), tf.cast(w, tf.int32)]),
-        interpolation=method.upper(),  # "BILINEAR" / "NEAREST"
-        fill_value=0.0
+    def get_params_dependent_on_targets(self, params):
+        image = params["image"]
+        height, width = image.shape[:2]
+        scale = float(np.random.uniform(self.scale_min, self.scale_max))
+        nh = max(1, int(round(height * scale)))
+        nw = max(1, int(round(width * scale)))
+        max_top = max(nh - self.target_height, 0)
+        max_left = max(nw - self.target_width, 0)
+        top = int(np.random.randint(0, max_top + 1)) if max_top > 0 else 0
+        left = int(np.random.randint(0, max_left + 1)) if max_left > 0 else 0
+        return {"scale": scale, "nh": nh, "nw": nw, "top": top, "left": left}
+
+    @property
+    def targets_as_params(self):
+        return ["image"]
+
+    def get_transform_init_args_names(self):
+        return ("scale_min", "scale_max", "target_height", "target_width")
+
+
+def _build_albu_pipeline(cfg: AugmentConfig, height: int, width: int) -> A.Compose:
+    transforms = []
+
+    if not cfg.enabled:
+        transforms.append(
+            A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
+        )
+        return A.Compose(transforms)
+
+    scale_min = cfg.random_scale_min
+    scale_max = cfg.random_scale_max
+    if cfg.random_crop or scale_min != 1.0 or scale_max != 1.0:
+        transforms.append(RandomScaleCrop(scale_min, scale_max, height, width))
+    else:
+        transforms.append(
+            A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
+        )
+
+    if cfg.hflip:
+        transforms.append(A.HorizontalFlip(p=0.5))
+    if cfg.vflip:
+        transforms.append(A.VerticalFlip(p=0.5))
+
+    if cfg.random_rotate_deg > 0:
+        transforms.append(
+            A.Rotate(
+                limit=(-cfg.random_rotate_deg, cfg.random_rotate_deg),
+                border_mode=cv2.BORDER_CONSTANT,
+                value=0.0,
+                mask_value=255,
+                interpolation=cv2.INTER_LINEAR,
+            )
+        )
+
+    color_params = [
+        cfg.brightness_delta,
+        cfg.contrast_delta,
+        cfg.saturation_delta,
+        cfg.hue_delta,
+    ]
+    if any(delta > 0 for delta in color_params):
+        transforms.append(
+            A.ColorJitter(
+                brightness=cfg.brightness_delta,
+                contrast=cfg.contrast_delta,
+                saturation=cfg.saturation_delta,
+                hue=cfg.hue_delta,
+            )
+        )
+
+    if cfg.gaussian_noise_std > 0:
+        std255 = cfg.gaussian_noise_std * 255.0
+        transforms.append(A.GaussNoise(var_limit=(0.0, float(std255**2)), mean=0.0))
+
+    transforms.append(
+        A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
     )
-    return tf.squeeze(out4, 0)  # [H,W,C]
 
-# ---------- flips ----------
-def _maybe_hflip(x, y):
-    do = tf.less(tf.random.uniform([]), 0.5)
-    return tf.cond(do,
-                   lambda: (tf.image.flip_left_right(x), tf.image.flip_left_right(y)),
-                   lambda: (x, y))
+    return A.Compose(transforms)
 
-def _maybe_vflip(x, y):
-    do = tf.less(tf.random.uniform([]), 0.5)
-    return tf.cond(do,
-                   lambda: (tf.image.flip_up_down(x), tf.image.flip_up_down(y)),
-                   lambda: (x, y))
 
-def _random_rotate(x, y, deg: float):
-    if deg <= 0: return x, y
-    angle = tf.random.uniform([], -deg, deg) * 3.14159265 / 180.0
-    x = _rotate_3d(x, angle, method="bilinear")
-    y = _rotate_3d(y, angle, method="nearest")
-    return x, y
-
-# ---------- scale + crop ----------
-def _random_rescale_and_crop(x, y, h, w, smin, smax):
-    if smin == 1.0 and smax == 1.0:
-        return _resize_3d(x, (h, w), "bilinear"), _resize_3d(y, (h, w), "nearest")
-    s = tf.random.uniform([], smin, smax)
-    nh = tf.cast(tf.round(tf.cast(h, tf.float32) * s), tf.int32)
-    nw = tf.cast(tf.round(tf.cast(w, tf.float32) * s), tf.int32)
-
-    x = _resize_3d(x, (nh, nw), "bilinear")
-    y = _resize_3d(y, (nh, nw), "nearest")
-
-    off_h = tf.cond(nh > h, lambda: tf.random.uniform([], 0, nh - h + 1, dtype=tf.int32), lambda: 0)
-    off_w = tf.cond(nw > w, lambda: tf.random.uniform([], 0, nw - w + 1, dtype=tf.int32), lambda: 0)
-    crop_h = tf.minimum(h, nh); crop_w = tf.minimum(w, nw)
-
-    x = _crop_to_box_3d(x, off_h, off_w, crop_h, crop_w)
-    y = _crop_to_box_3d(y, off_h, off_w, crop_h, crop_w)
-
-    x = _resize_3d(x, (h, w), "bilinear")
-    y = _resize_3d(y, (h, w), "nearest")
-    return x, y
-
-# ---------- photométrie ----------
-def _color_jitter(x, cfg: AugmentConfig):
-    if cfg.brightness_delta > 0: x = tf.image.random_brightness(x, cfg.brightness_delta)
-    if cfg.contrast_delta > 0:   x = tf.image.random_contrast(x, 1-cfg.contrast_delta, 1+cfg.contrast_delta)
-    if cfg.saturation_delta > 0: x = tf.image.random_saturation(x, 1-cfg.saturation_delta, 1+cfg.saturation_delta)
-    if cfg.hue_delta > 0:        x = tf.image.random_hue(x, cfg.hue_delta)
-    return tf.clip_by_value(x, 0.0, 1.0)
-
-def _gaussian_noise(x, std: float):
-    if std <= 0: return x
-    noise = tf.random.normal(tf.shape(x), 0.0, std, dtype=x.dtype)
-    return tf.clip_by_value(x + noise, 0.0, 1.0)
-
-# ---------- API ----------
 def build_augment_fn(cfg: AugmentConfig, h: int, w: int):
+    pipeline = _build_albu_pipeline(cfg, h, w)
+
+    def _augment_numpy(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        image = np.asarray(image, dtype=np.float32)
+        mask = np.asarray(mask, dtype=np.int32)
+
+        image_scaled = np.clip(image * 255.0, 0.0, 255.0).astype(np.float32)
+        mask_for_aug = np.ascontiguousarray(mask.astype(np.uint8))
+        augmented = pipeline(image=image_scaled, mask=mask_for_aug)
+        aug_img = np.clip(augmented["image"] / 255.0, 0.0, 1.0).astype(np.float32)
+        aug_mask = augmented["mask"].astype(np.int32)
+        return aug_img, aug_mask
+
     def _fn(x: tf.Tensor, y: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        x = tf.convert_to_tensor(x, dtype=tf.float32)  # [H,W,3]
-        y = tf.cast(y, tf.int32)                       # [H,W]
-        y = tf.expand_dims(y, -1)                      # [H,W,1]
-        y = tf.cast(y, tf.float32)                     # géométrie en float32
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        y = tf.cast(y, tf.int32)
 
-        if not cfg.enabled:
-            x = _resize_3d(x, (h, w), "bilinear")
-            y = _resize_3d(y, (h, w), "nearest")
-            y = tf.squeeze(tf.cast(tf.round(y), tf.int32), -1)   # [h,w]
-            return x, y
+        aug_x, aug_y = tf.numpy_function(
+            func=_augment_numpy,
+            inp=[x, y],
+            Tout=[tf.float32, tf.int32],
+        )
+        aug_x.set_shape((h, w, 3))
+        aug_y.set_shape((h, w))
+        return aug_x, aug_y
 
-        if cfg.random_crop or cfg.random_scale_min != 1.0 or cfg.random_scale_max != 1.0:
-            x, y = _random_rescale_and_crop(x, y, h, w, cfg.random_scale_min, cfg.random_scale_max)
-        else:
-            x = _resize_3d(x, (h, w), "bilinear")
-            y = _resize_3d(y, (h, w), "nearest")
-
-        if cfg.hflip: x, y = _maybe_hflip(x, y)
-        if cfg.vflip: x, y = _maybe_vflip(x, y)
-
-        x, y = _random_rotate(x, y, cfg.random_rotate_deg)
-
-        x = _color_jitter(x, cfg)
-        x = _gaussian_noise(x, cfg.gaussian_noise_std)
-
-        y = tf.squeeze(tf.cast(tf.round(y), tf.int32), -1)       # [h,w]
-        return x, y
     return _fn
