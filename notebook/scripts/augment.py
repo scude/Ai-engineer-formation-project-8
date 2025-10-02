@@ -34,14 +34,50 @@ class RandomScaleCrop(A.DualTransform):
         return self._apply(mask, scale, nh, nw, top, left, cv2.INTER_NEAREST)
 
     def _apply(self, arr, scale, nh, nw, top, left, interpolation):
+        for attempt in range(3):
+            if nh is None or nw is None or nh < 1 or nw < 1:
+                if attempt == 2:
+                    raise ValueError(
+                        "RandomScaleCrop failed to sample valid resize dimensions"
+                    )
+                new_params = self.get_params_dependent_on_targets({"image": arr})
+                scale = new_params["scale"]
+                nh = new_params["nh"]
+                nw = new_params["nw"]
+                top = new_params["top"]
+                left = new_params["left"]
+                continue
+            break
+
+        nh = max(1, int(nh))
+        nw = max(1, int(nw))
+
         resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
         bottom = min(top + self.target_height, nh)
         right = min(left + self.target_width, nw)
         cropped = resized[top:bottom, left:right]
+        if cropped.shape[0] == 0 or cropped.shape[1] == 0:
+            for attempt in range(2):
+                new_params = self.get_params_dependent_on_targets({"image": arr})
+                nh = max(1, int(new_params["nh"]))
+                nw = max(1, int(new_params["nw"]))
+                top = new_params["top"]
+                left = new_params["left"]
+                resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
+                bottom = min(top + self.target_height, nh)
+                right = min(left + self.target_width, nw)
+                cropped = resized[top:bottom, left:right]
+                if cropped.shape[0] > 0 and cropped.shape[1] > 0:
+                    break
+            else:
+                raise ValueError(
+                    "RandomScaleCrop produced an empty crop after resampling "
+                    f"parameters: top={top}, left={left}, nh={nh}, nw={nw}"
+                )
         if cropped.shape[0] != self.target_height or cropped.shape[1] != self.target_width:
             cropped = cv2.resize(
                 cropped,
-                (self.target_width, self.target_height),
+                (max(1, self.target_width), max(1, self.target_height)),
                 interpolation=interpolation,
             )
         return cropped
