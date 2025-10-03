@@ -33,24 +33,30 @@ class RandomScaleCrop(A.DualTransform):
     def apply_to_mask(self, mask, scale=1.0, nh=0, nw=0, top=0, left=0, **params):
         return self._apply(mask, scale, nh, nw, top, left, cv2.INTER_NEAREST)
 
+    def _sample_params(self, image):
+        params = self.get_params_dependent_on_data({"image": image})
+        params["nh"] = max(1, int(params.get("nh", 0) or 0))
+        params["nw"] = max(1, int(params.get("nw", 0) or 0))
+        return params
+
     def _apply(self, arr, scale, nh, nw, top, left, interpolation):
+        params = {"scale": scale, "nh": nh, "nw": nw, "top": top, "left": left}
+
         for attempt in range(3):
-            if nh is None or nw is None or nh < 1 or nw < 1:
+            if params["nh"] is None or params["nw"] is None or params["nh"] < 1 or params["nw"] < 1:
                 if attempt == 2:
                     raise ValueError(
                         "RandomScaleCrop failed to sample valid resize dimensions"
                     )
-                new_params = self.get_params_dependent_on_targets({"image": arr})
-                scale = new_params["scale"]
-                nh = new_params["nh"]
-                nw = new_params["nw"]
-                top = new_params["top"]
-                left = new_params["left"]
+                params = self._sample_params(arr)
                 continue
             break
 
-        nh = max(1, int(nh))
-        nw = max(1, int(nw))
+        scale = params["scale"]
+        nh = max(1, int(params["nh"]))
+        nw = max(1, int(params["nw"]))
+        top = params["top"]
+        left = params["left"]
 
         resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
         bottom = min(top + self.target_height, nh)
@@ -58,7 +64,7 @@ class RandomScaleCrop(A.DualTransform):
         cropped = resized[top:bottom, left:right]
         if cropped.shape[0] == 0 or cropped.shape[1] == 0:
             for attempt in range(2):
-                new_params = self.get_params_dependent_on_targets({"image": arr})
+                new_params = self._sample_params(arr)
                 nh = max(1, int(new_params["nh"]))
                 nw = max(1, int(new_params["nw"]))
                 top = new_params["top"]
@@ -82,7 +88,7 @@ class RandomScaleCrop(A.DualTransform):
             )
         return cropped
 
-    def get_params_dependent_on_targets(self, params):
+    def get_params_dependent_on_data(self, params):
         image = params["image"]
         height, width = image.shape[:2]
         scale = float(np.random.uniform(self.scale_min, self.scale_max))
