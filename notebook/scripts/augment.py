@@ -204,7 +204,17 @@ def _build_albu_pipeline(
     return A.Compose(transforms)
 
 
-def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int = 0):
+def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int):
+    """Create an augmentation function for images and masks.
+
+    Args:
+        cfg: Augmentation configuration that defines the pipeline.
+        h: Target image height.
+        w: Target image width.
+        ignore_index: Value used to mark pixels that should be ignored during loss
+            computation. This value is propagated to Albumentations transforms that
+            need it (e.g. rotations).
+    """
     pipeline = _build_albu_pipeline(cfg, h, w, ignore_index)
 
     def _augment_numpy(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
