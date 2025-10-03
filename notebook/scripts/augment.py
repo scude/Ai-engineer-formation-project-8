@@ -34,7 +34,11 @@ class RandomScaleCrop(A.DualTransform):
         return self._apply(mask, scale, nh, nw, top, left, cv2.INTER_NEAREST)
 
     def _sample_params(self, image):
-        params = self.get_params_dependent_on_data({"image": image})
+        params_dict = {"image": image}
+        params = self.get_params_dependent_on_data(
+            params=params_dict,
+            data=params_dict,
+        )
         params["nh"] = max(1, int(params.get("nh", 0) or 0))
         params["nw"] = max(1, int(params.get("nw", 0) or 0))
         return params
@@ -88,8 +92,9 @@ class RandomScaleCrop(A.DualTransform):
             )
         return cropped
 
-    def get_params_dependent_on_data(self, params):
-        image = params["image"]
+    def get_params_dependent_on_data(self, params, data=None):
+        data = data or params
+        image = data["image"]
         height, width = image.shape[:2]
         scale = float(np.random.uniform(self.scale_min, self.scale_max))
         nh = max(1, int(round(height * scale)))
@@ -176,10 +181,10 @@ def build_augment_fn(cfg: AugmentConfig, h: int, w: int):
         image = np.asarray(image, dtype=np.float32)
         mask = np.asarray(mask, dtype=np.int32)
 
-        image_scaled = np.clip(image * 255.0, 0.0, 255.0).astype(np.float32)
-        mask_for_aug = np.ascontiguousarray(mask.astype(np.uint8))
-        augmented = pipeline(image=image_scaled, mask=mask_for_aug)
-        aug_img = np.clip(augmented["image"] / 255.0, 0.0, 1.0).astype(np.float32)
+        image_u8 = np.clip(image * 255.0, 0.0, 255.0).astype(np.uint8)
+        mask_u8 = np.ascontiguousarray(mask.astype(np.uint8))
+        augmented = pipeline(image=image_u8, mask=mask_u8)
+        aug_img = augmented["image"].astype(np.float32) / 255.0
         aug_mask = augmented["mask"].astype(np.int32)
         return aug_img, aug_mask
 
