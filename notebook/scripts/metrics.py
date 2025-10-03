@@ -8,12 +8,12 @@ class MaskedMeanIoU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true, tf.int32)
         y_pred = tf.cast(tf.argmax(y_pred, axis=-1), tf.int32)
-        mask = tf.not_equal(y_true, self.ignore_index)  # bool
 
         if sample_weight is not None:
             sample_weight = tf.convert_to_tensor(sample_weight)
-            weight_mask = tf.greater(sample_weight, 0)
-            mask = tf.logical_and(mask, weight_mask)
+            mask = tf.greater(sample_weight, 0)
+        else:
+            mask = tf.not_equal(y_true, self.ignore_index)
 
         # on compresse les tenseurs sur les pixels valides
         y_true_valid = tf.boolean_mask(y_true, mask)
