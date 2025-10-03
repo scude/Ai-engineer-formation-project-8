@@ -27,63 +27,96 @@ class RandomScaleCrop(A.DualTransform):
         self.target_height = target_height
         self.target_width = target_width
 
-    def apply(self, image, scale=1.0, nh=0, nw=0, top=0, left=0, **params):
-        return self._apply(image, scale, nh, nw, top, left, cv2.INTER_LINEAR)
+    def apply(self, image, **params):
+        params = self._ensure_valid_params(image, params)
+        return self._apply(image, params, cv2.INTER_LINEAR)
 
-    def apply_to_mask(self, mask, scale=1.0, nh=0, nw=0, top=0, left=0, **params):
-        return self._apply(mask, scale, nh, nw, top, left, cv2.INTER_NEAREST)
+    def apply_to_mask(self, mask, **params):
+        params = self._ensure_valid_params(mask, params)
+        return self._apply(mask, params, cv2.INTER_NEAREST)
 
-    def _sample_params(self, image):
-        params_dict = {"image": image}
-        params = self.get_params_dependent_on_data(
-            params=params_dict,
-            data=params_dict,
-        )
-        params["nh"] = max(1, int(params.get("nh", 0) or 0))
-        params["nw"] = max(1, int(params.get("nw", 0) or 0))
-        return params
+    def _sample_params(self, height: int, width: int) -> dict:
+        scale = float(np.random.uniform(self.scale_min, self.scale_max))
+        nh = max(1, int(round(height * scale)))
+        nw = max(1, int(round(width * scale)))
+        max_top = max(nh - self.target_height, 0)
+        max_left = max(nw - self.target_width, 0)
+        top = int(np.random.randint(0, max_top + 1)) if max_top > 0 else 0
+        left = int(np.random.randint(0, max_left + 1)) if max_left > 0 else 0
+        return {
+            "scale": scale,
+            "nh": nh,
+            "nw": nw,
+            "top": top,
+            "left": left,
+            "_src_h": height,
+            "_src_w": width,
+        }
 
-    def _apply(self, arr, scale, nh, nw, top, left, interpolation):
-        params = {"scale": scale, "nh": nh, "nw": nw, "top": top, "left": left}
+    def _ensure_valid_params(self, arr, params):
+        if params.get("_validated"):
+            return params
+
+        height = int(params.get("_src_h") or arr.shape[0])
+        width = int(params.get("_src_w") or arr.shape[1])
+
+        # Remove stale validation flag when re-entering after resampling
+        params.pop("_validated", None)
 
         for attempt in range(3):
-            if params["nh"] is None or params["nw"] is None or params["nh"] < 1 or params["nw"] < 1:
+            nh = int(params.get("nh") or 0)
+            nw = int(params.get("nw") or 0)
+            if nh < 1 or nw < 1:
                 if attempt == 2:
                     raise ValueError(
                         "RandomScaleCrop failed to sample valid resize dimensions"
                     )
-                params = self._sample_params(arr)
+                params.update(self._sample_params(height, width))
                 continue
-            break
 
-        scale = params["scale"]
+            top = int(params.get("top") or 0)
+            left = int(params.get("left") or 0)
+            max_top = max(nh - self.target_height, 0)
+            max_left = max(nw - self.target_width, 0)
+            if max_top == 0:
+                top = 0
+            else:
+                top = int(np.clip(top, 0, max_top))
+            if max_left == 0:
+                left = 0
+            else:
+                left = int(np.clip(left, 0, max_left))
+
+            bottom = min(top + self.target_height, nh)
+            right = min(left + self.target_width, nw)
+            if bottom <= top or right <= left:
+                if attempt == 2:
+                    raise ValueError(
+                        "RandomScaleCrop produced an empty crop after resampling "
+                        f"parameters: top={top}, left={left}, nh={nh}, nw={nw}"
+                    )
+                params.update(self._sample_params(height, width))
+                continue
+
+            params.update({"nh": nh, "nw": nw, "top": top, "left": left})
+            params["_validated"] = True
+            return params
+
+        raise ValueError("RandomScaleCrop could not determine valid parameters")
+
+    def _apply(self, arr, params, interpolation):
+        params = self._ensure_valid_params(arr, params)
+
         nh = max(1, int(params["nh"]))
         nw = max(1, int(params["nw"]))
-        top = params["top"]
-        left = params["left"]
+        top = int(params["top"])
+        left = int(params["left"])
 
         resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
         bottom = min(top + self.target_height, nh)
         right = min(left + self.target_width, nw)
         cropped = resized[top:bottom, left:right]
-        if cropped.shape[0] == 0 or cropped.shape[1] == 0:
-            for attempt in range(2):
-                new_params = self._sample_params(arr)
-                nh = max(1, int(new_params["nh"]))
-                nw = max(1, int(new_params["nw"]))
-                top = new_params["top"]
-                left = new_params["left"]
-                resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
-                bottom = min(top + self.target_height, nh)
-                right = min(left + self.target_width, nw)
-                cropped = resized[top:bottom, left:right]
-                if cropped.shape[0] > 0 and cropped.shape[1] > 0:
-                    break
-            else:
-                raise ValueError(
-                    "RandomScaleCrop produced an empty crop after resampling "
-                    f"parameters: top={top}, left={left}, nh={nh}, nw={nw}"
-                )
+
         if cropped.shape[0] != self.target_height or cropped.shape[1] != self.target_width:
             cropped = cv2.resize(
                 cropped,
@@ -96,14 +129,7 @@ class RandomScaleCrop(A.DualTransform):
         data = data or params
         image = data["image"]
         height, width = image.shape[:2]
-        scale = float(np.random.uniform(self.scale_min, self.scale_max))
-        nh = max(1, int(round(height * scale)))
-        nw = max(1, int(round(width * scale)))
-        max_top = max(nh - self.target_height, 0)
-        max_left = max(nw - self.target_width, 0)
-        top = int(np.random.randint(0, max_top + 1)) if max_top > 0 else 0
-        left = int(np.random.randint(0, max_left + 1)) if max_left > 0 else 0
-        return {"scale": scale, "nh": nh, "nw": nw, "top": top, "left": left}
+        return self._sample_params(height, width)
 
     @property
     def targets_as_params(self):
