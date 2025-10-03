@@ -168,7 +168,9 @@ def _build_albu_pipeline(cfg: AugmentConfig, height: int, width: int) -> A.Compo
                 limit=(-cfg.random_rotate_deg, cfg.random_rotate_deg),
                 border_mode=cv2.BORDER_CONSTANT,
                 value=0.0,
-                mask_value=255,
+                # Keep rotated mask pixels outside the frame in class 0, matching
+                # the historical TensorFlow-based pipeline behaviour.
+                mask_value=0,
                 interpolation=cv2.INTER_LINEAR,
             )
         )
