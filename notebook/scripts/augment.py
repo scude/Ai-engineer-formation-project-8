@@ -139,7 +139,9 @@ class RandomScaleCrop(A.DualTransform):
         return ("scale_min", "scale_max", "target_height", "target_width")
 
 
-def _build_albu_pipeline(cfg: AugmentConfig, height: int, width: int) -> A.Compose:
+def _build_albu_pipeline(
+    cfg: AugmentConfig, height: int, width: int, ignore_index: int
+) -> A.Compose:
     transforms = []
 
     if not cfg.enabled:
@@ -168,9 +170,9 @@ def _build_albu_pipeline(cfg: AugmentConfig, height: int, width: int) -> A.Compo
                 limit=(-cfg.random_rotate_deg, cfg.random_rotate_deg),
                 border_mode=cv2.BORDER_CONSTANT,
                 value=0.0,
-                # Keep rotated mask pixels outside the frame in class 0, matching
-                # the historical TensorFlow-based pipeline behaviour.
-                mask_value=0,
+                # Fill exposed mask regions with the dataset ignore label so that
+                # they can be masked out during loss computation.
+                mask_value=ignore_index,
                 interpolation=cv2.INTER_LINEAR,
             )
         )
@@ -202,8 +204,8 @@ def _build_albu_pipeline(cfg: AugmentConfig, height: int, width: int) -> A.Compo
     return A.Compose(transforms)
 
 
-def build_augment_fn(cfg: AugmentConfig, h: int, w: int):
-    pipeline = _build_albu_pipeline(cfg, h, w)
+def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int = 0):
+    pipeline = _build_albu_pipeline(cfg, h, w, ignore_index)
 
     def _augment_numpy(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         image = np.asarray(image, dtype=np.float32)

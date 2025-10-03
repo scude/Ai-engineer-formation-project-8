@@ -5,6 +5,10 @@ tf = pytest.importorskip("tensorflow")
 
 from notebook.scripts.augment import build_augment_fn
 from notebook.scripts.config import AugmentConfig
+from notebook.scripts.data import make_weights
+
+
+IGNORE_INDEX = 255
 
 
 def test_color_jitter_output_not_black():
@@ -19,7 +23,7 @@ def test_color_jitter_output_not_black():
         hue_delta=0.1,
     )
 
-    augment_fn = build_augment_fn(cfg, h=32, w=32)
+    augment_fn = build_augment_fn(cfg, h=32, w=32, ignore_index=IGNORE_INDEX)
 
     image = np.full((32, 32, 3), 0.5, dtype=np.float32)
     mask = np.zeros((32, 32), dtype=np.uint8)
@@ -51,7 +55,7 @@ def test_random_scale_crop_keeps_mask_alignment():
         random_rotate_deg=0.0,
     )
 
-    augment_fn = build_augment_fn(cfg, h=32, w=32)
+    augment_fn = build_augment_fn(cfg, h=32, w=32, ignore_index=IGNORE_INDEX)
 
     image = np.zeros((32, 32, 3), dtype=np.float32)
     mask = np.zeros((32, 32), dtype=np.uint8)
@@ -81,7 +85,7 @@ def test_random_scale_crop_keeps_mask_alignment():
     assert np.any(mask_positive & (image_gray >= max_val - 1e-6)), "Mask should overlap image peak"
 
 
-def test_rotation_masks_do_not_produce_255_values():
+def test_rotation_masks_fill_with_ignore_label_and_zero_weights():
     np.random.seed(42)
 
     cfg = AugmentConfig(
@@ -94,16 +98,27 @@ def test_rotation_masks_do_not_produce_255_values():
         random_rotate_deg=45.0,
     )
 
-    augment_fn = build_augment_fn(cfg, h=32, w=32)
+    augment_fn = build_augment_fn(cfg, h=32, w=32, ignore_index=IGNORE_INDEX)
 
     image = np.zeros((32, 32, 3), dtype=np.float32)
     mask = np.zeros((32, 32), dtype=np.uint8)
     mask[8:24, 8:24] = 1
 
-    for _ in range(5):
+    for _ in range(10):
         _, aug_mask = augment_fn(tf.constant(image), tf.constant(mask))
         aug_mask_np = aug_mask.numpy()
         unique_values = np.unique(aug_mask_np)
 
-        assert 255 not in unique_values
         assert unique_values.min() >= 0
+        if IGNORE_INDEX in unique_values:
+            newly_exposed = aug_mask_np == IGNORE_INDEX
+            assert np.any(newly_exposed), "Rotation should create ignored pixels"
+
+            weights = make_weights(tf.constant(aug_mask_np, dtype=tf.int32), IGNORE_INDEX)
+            weights_np = weights.numpy()
+
+            assert np.all(weights_np[newly_exposed] == 0.0)
+            assert np.all(weights_np[~newly_exposed] == 1.0)
+            break
+    else:
+        pytest.fail("Rotate did not produce ignore-index pixels within iterations")

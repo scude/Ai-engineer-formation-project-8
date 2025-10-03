@@ -49,7 +49,7 @@ def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: boo
     if xs: print("ex:", xs[0], "->", ys[0])
 
     lut = build_cityscapes_8cls_lut(cfg.ignore_index)
-    aug_fn = build_augment_fn(aug, cfg.height, cfg.width)
+    aug_fn = build_augment_fn(aug, cfg.height, cfg.width, cfg.ignore_index)
     AUTOTUNE = tf.data.AUTOTUNE if cfg.autotune is None else cfg.autotune
 
     def _parse(xp, yp):
