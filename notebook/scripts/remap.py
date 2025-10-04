@@ -1,6 +1,7 @@
 # /scripts/remap.py
 import tensorflow as tf
 
+
 def build_cityscapes_8cls_lut(ignore_index: int = 255) -> tf.Tensor:
     """Return a 256-entry lookup table mapping Cityscapes IDs to 8 classes.
 
@@ -33,6 +34,32 @@ def build_cityscapes_8cls_lut(ignore_index: int = 255) -> tf.Tensor:
 
     return tf.constant(table, dtype=tf.int32)
 
+
 @tf.function
 def remap_labels(y: tf.Tensor, lut: tf.Tensor) -> tf.Tensor:
     return tf.gather(lut, y)
+
+
+def remap_label_ids(mask: tf.Tensor, ignore_index: int = 255) -> tf.Tensor:
+    """Remap raw Cityscapes IDs in ``mask`` to contiguous training IDs.
+
+    Parameters
+    ----------
+    mask:
+        Tensor containing raw Cityscapes IDs, typically decoded from the PNG
+        ground-truth annotations.
+    ignore_index:
+        Label used to denote ignored/void pixels. Defaults to the Cityscapes
+        convention of ``255``.
+
+    Returns
+    -------
+    tf.Tensor
+        Tensor of type ``tf.int32`` with the same shape as ``mask`` where all
+        valid IDs are mapped to the ``[0, 7]`` range and void pixels keep the
+        ``ignore_index`` value.
+    """
+
+    mask = tf.cast(mask, tf.int32)
+    lut = build_cityscapes_8cls_lut(ignore_index)
+    return tf.cast(remap_labels(mask, lut), tf.int32)

@@ -2,7 +2,7 @@ import os, glob
 from typing import List, Tuple
 import tensorflow as tf
 from .config import DataConfig, AugmentConfig
-from .remap import build_cityscapes_8cls_lut, remap_labels
+from .remap import remap_label_ids
 from .augment import build_augment_fn
 
 def left_to_label_path(lp, left_dir, gt_dir, img_suffix, lbl_suffix):
@@ -53,14 +53,13 @@ def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: boo
     print(f"[info] {split}: {len(xs)} pairs | missing: {len(miss)}")
     if xs: print("ex:", xs[0], "->", ys[0])
 
-    lut = build_cityscapes_8cls_lut(cfg.ignore_index)
     aug_fn = build_augment_fn(aug, cfg.height, cfg.width, cfg.ignore_index)
     AUTOTUNE = tf.data.AUTOTUNE if cfg.autotune is None else cfg.autotune
 
     def _parse(xp, yp):
         x = decode_img(xp)
         y = decode_lbl(yp)
-        y = remap_labels(y, lut)                   # {0..7,255}
+        y = remap_label_ids(y, cfg.ignore_index)   # {0..7,255}
         x, y = aug_fn(x, y)                        # resize + aug (shapes imposées)
         w = make_weights(y, cfg.ignore_index)      # 0 on ignore
         y = tf.cast(y, tf.int32)
