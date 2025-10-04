@@ -12,7 +12,7 @@ from tensorflow import keras
 from .config import DataConfig, TrainConfig, AugmentConfig
 from .data import build_dataset, prepare_labels_for_loss
 from .models import build_model
-from .metrics import MaskedMeanIoU
+from .metrics import masked_mean_iou
 from .mlflow_utils import init_mlflow, start_run, KerasMlflowLogger
 import mlflow, mlflow.keras
 
@@ -72,8 +72,13 @@ def train(model_name: str = "deeplab_resnet50",
     def loss(y_true, y_pred):
         y_true = prepare_labels_for_loss(y_true, data_cfg.ignore_index)
         return base_loss(y_true, y_pred)
-    metrics = [keras.metrics.SparseCategoricalAccuracy(name="pix_acc"),
-               MaskedMeanIoU(num_classes=data_cfg.num_classes, ignore_index=data_cfg.ignore_index)]
+    metrics = [
+        keras.metrics.SparseCategoricalAccuracy(name="pix_acc"),
+        masked_mean_iou(
+            num_classes=data_cfg.num_classes,
+            ignore_index=data_cfg.ignore_index,
+        )(),
+    ]
     opt = build_optimizer(train_cfg.optimizer, train_cfg.lr)
     model.compile(optimizer=opt, loss=loss, metrics=metrics)
 

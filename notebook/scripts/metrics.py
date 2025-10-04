@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-__all__ = ["MaskedMeanIoU", "masked_pixel_accuracy"]
+__all__ = ["MaskedMeanIoU", "masked_mean_iou", "masked_pixel_accuracy"]
 
 class MaskedMeanIoU(tf.keras.metrics.MeanIoU):
     def __init__(self, num_classes: int, ignore_index: int, name="masked_mIoU", **kwargs):
@@ -25,6 +25,21 @@ class MaskedMeanIoU(tf.keras.metrics.MeanIoU):
 
         # évite l’avertissement de Keras (pas de sample_weight float/int)
         return super().update_state(y_true_valid, y_pred_valid, sample_weight=None)
+
+
+def masked_mean_iou(num_classes, ignore_index, name="masked_mIoU", dtype=None):
+    """Return a callable that builds :class:`MaskedMeanIoU` with preset arguments."""
+
+    def factory():
+        return MaskedMeanIoU(
+            num_classes=num_classes,
+            ignore_index=ignore_index,
+            name=name,
+            dtype=dtype,
+        )
+
+    factory.__name__ = name
+    return factory
 
 
 def masked_pixel_accuracy(y_true, y_pred, ignore_index):
