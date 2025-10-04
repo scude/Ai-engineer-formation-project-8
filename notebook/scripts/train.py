@@ -93,6 +93,18 @@ def train(model_name: str = "deeplab_resnet50",
 
     hist = model.fit(train_ds, validation_data=val_ds, epochs=train_cfg.epochs, callbacks=callbacks, verbose=1)
 
+    # evaluate restored weights (EarlyStopping may have reloaded best checkpoint)
+    restored_metrics = model.evaluate(val_ds, return_dict=True)
+    print("Restored weights evaluation:")
+    for name, value in restored_metrics.items():
+        print(f"  {name}: {value:.6f}")
+        mlflow.log_metric(f"restored_{name}", float(value))
+
+    hist_len = len(hist.history.get("loss", []))
+    if hist_len:
+        for name, value in restored_metrics.items():
+            mlflow.log_metric(name, float(value), step=hist_len)
+
     # save final
     final_path = os.path.join(train_cfg.output_dir, f"{model_name}_final.keras")
     model.save(final_path)
