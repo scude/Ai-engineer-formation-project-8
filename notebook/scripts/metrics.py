@@ -15,11 +15,7 @@ class MaskedMeanIoU(tf.keras.metrics.MeanIoU):
         y_true = tf.cast(y_true, tf.int32)
         y_pred = tf.cast(tf.argmax(y_pred, axis=-1), tf.int32)
 
-        if sample_weight is not None:
-            sample_weight = tf.convert_to_tensor(sample_weight)
-            mask = tf.greater(sample_weight, 0)
-        else:
-            mask = tf.not_equal(y_true, self.ignore_index)
+        mask = tf.not_equal(y_true, self.ignore_index)
 
         # on compresse les tenseurs sur les pixels valides
         y_true_valid = tf.boolean_mask(y_true, mask)

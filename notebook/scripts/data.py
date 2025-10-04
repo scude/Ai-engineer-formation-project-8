@@ -40,8 +40,13 @@ def decode_lbl(path: tf.Tensor):
 def make_weights(y, ignore_index):
     return tf.where(tf.equal(y, ignore_index), 0.0, 1.0)
 
-def sanitize_labels_for_loss(y, ignore_index):
+def prepare_labels_for_loss(y, ignore_index):
     return tf.where(tf.equal(y, ignore_index), tf.zeros_like(y), y)
+
+
+# Backwards compatibility for older notebooks/imports relying on the previous name.
+def sanitize_labels_for_loss(y, ignore_index):
+    return prepare_labels_for_loss(y, ignore_index)
 
 def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: bool):
     xs, ys, miss = gather_pairs(cfg, split)
@@ -58,7 +63,6 @@ def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: boo
         y = remap_labels(y, lut)                   # {0..7,255}
         x, y = aug_fn(x, y)                        # resize + aug (shapes imposées)
         w = make_weights(y, cfg.ignore_index)      # 0 on ignore
-        y = sanitize_labels_for_loss(y, cfg.ignore_index)
         y = tf.cast(y, tf.int32)
         # shapes finales strictes
         x = tf.ensure_shape(x, [cfg.height, cfg.width, 3])
