@@ -1,4 +1,6 @@
 # /scripts/augment.py
+from __future__ import annotations
+
 from typing import Tuple
 
 import albumentations as A
@@ -7,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from .config import AugmentConfig
+from .data_utils import resize_image_and_mask
 
 
 class RandomScaleCrop(A.DualTransform):
@@ -141,23 +144,16 @@ class RandomScaleCrop(A.DualTransform):
 
 def _build_albu_pipeline(
     cfg: AugmentConfig, height: int, width: int, ignore_index: int
-) -> A.Compose:
-    transforms = []
-
+) -> A.Compose | None:
     if not cfg.enabled:
-        transforms.append(
-            A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
-        )
-        return A.Compose(transforms)
+        return None
+
+    transforms = []
 
     scale_min = cfg.random_scale_min
     scale_max = cfg.random_scale_max
     if cfg.random_crop or scale_min != 1.0 or scale_max != 1.0:
         transforms.append(RandomScaleCrop(scale_min, scale_max, height, width))
-    else:
-        transforms.append(
-            A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
-        )
 
     if cfg.hflip:
         transforms.append(A.HorizontalFlip(p=0.5))
@@ -197,9 +193,8 @@ def _build_albu_pipeline(
         std255 = cfg.gaussian_noise_std * 255.0
         transforms.append(A.GaussNoise(var_limit=(0.0, float(std255**2)), mean=0.0))
 
-    transforms.append(
-        A.Resize(height=height, width=width, interpolation=cv2.INTER_LINEAR, mask_interpolation=cv2.INTER_NEAREST)
-    )
+    if not transforms:
+        transforms.append(A.NoOp(always_apply=True))
 
     return A.Compose(transforms)
 
@@ -221,6 +216,9 @@ def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int):
         image = np.asarray(image, dtype=np.float32)
         mask = np.asarray(mask, dtype=np.int32)
 
+        if pipeline is None:
+            return image, mask
+
         image_u8 = np.clip(image * 255.0, 0.0, 255.0).astype(np.uint8)
         mask_u8 = np.ascontiguousarray(mask.astype(np.uint8))
         augmented = pipeline(image=image_u8, mask=mask_u8)
@@ -232,13 +230,18 @@ def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int):
         x = tf.convert_to_tensor(x, dtype=tf.float32)
         y = tf.cast(y, tf.int32)
 
-        aug_x, aug_y = tf.numpy_function(
-            func=_augment_numpy,
-            inp=[x, y],
-            Tout=[tf.float32, tf.int32],
-        )
-        aug_x.set_shape((h, w, 3))
-        aug_y.set_shape((h, w))
-        return aug_x, aug_y
+        if pipeline is not None:
+            aug_x, aug_y = tf.numpy_function(
+                func=_augment_numpy,
+                inp=[x, y],
+                Tout=[tf.float32, tf.int32],
+            )
+        else:
+            aug_x, aug_y = x, y
+
+        resized_x, resized_y = resize_image_and_mask(aug_x, aug_y, h, w)
+        resized_x.set_shape((h, w, 3))
+        resized_y.set_shape((h, w))
+        return resized_x, resized_y
 
     return _fn
