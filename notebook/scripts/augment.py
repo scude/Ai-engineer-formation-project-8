@@ -236,6 +236,8 @@ def build_augment_fn(cfg: AugmentConfig, h: int, w: int, ignore_index: int):
                 inp=[x, y],
                 Tout=[tf.float32, tf.int32],
             )
+            aug_x = tf.ensure_shape(aug_x, [None, None, 3])
+            aug_y = tf.ensure_shape(aug_y, [None, None])
         else:
             aug_x, aug_y = x, y
 
