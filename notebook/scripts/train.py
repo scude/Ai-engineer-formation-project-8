@@ -6,7 +6,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # masque INFO & WARNING C++
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
-import os, re, shutil, argparse, csv
+import re, shutil, argparse, csv, datetime
 import tensorflow as tf
 from tensorflow import keras
 from .config import DataConfig, TrainConfig, AugmentConfig
@@ -53,7 +53,8 @@ def train(model_name: str = "deeplab_resnet50",
 
     print(f"TF {tf.__version__} | GPUs: {tf.config.list_physical_devices('GPU')}")
     os.makedirs(train_cfg.output_dir, exist_ok=True)
-    ckpt_dir = os.path.join(train_cfg.output_dir, "checkpoints"); os.makedirs(ckpt_dir, exist_ok=True)
+    ckpt_root = os.path.join(train_cfg.output_dir, "checkpoints")
+    os.makedirs(ckpt_root, exist_ok=True)
 
     # data
     train_ds = build_dataset(data_cfg, aug_cfg, split="train", training=True)
@@ -75,6 +76,11 @@ def train(model_name: str = "deeplab_resnet50",
     # MLflow
     init_mlflow(train_cfg.exp_name)
     run = start_run(run_name=f"{model_name}")
+    run_id = getattr(getattr(run, "info", None), "run_id", None)
+    if not run_id:
+        run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    ckpt_dir = os.path.join(ckpt_root, run_id)
+    os.makedirs(ckpt_dir, exist_ok=True)
     max_train_samples = getattr(train_cfg, "max_train_samples", None)
     max_val_samples = getattr(train_cfg, "max_val_samples", None)
     mlf_logger = KerasMlflowLogger({
@@ -160,6 +166,9 @@ def train(model_name: str = "deeplab_resnet50",
             mlflow.log_metric("best_val_masked_mIoU", float(best_score))
         except Exception as e:
             print("mlflow keras flavor failed:", e)
+
+    if os.path.isdir(ckpt_dir):
+        shutil.rmtree(ckpt_dir, ignore_errors=True)
 
     mlflow.end_run()
     print("MLflow run ended.")
