@@ -6,7 +6,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # masque INFO & WARNING C++
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
-import os, re, shutil, argparse
+import os, re, shutil, argparse, csv
 import tensorflow as tf
 from tensorflow import keras
 from .config import DataConfig, TrainConfig, AugmentConfig
@@ -103,7 +103,38 @@ def train(model_name: str = "deeplab_resnet50",
     hist_len = len(hist.history.get("loss", []))
     if hist_len:
         for name, value in restored_metrics.items():
-            mlflow.log_metric(name, float(value), step=hist_len)
+            float_value = float(value)
+            mlflow.log_metric(name, float_value, step=hist_len)
+            mlflow.log_metric(f"val_{name}", float_value, step=hist_len)
+
+            val_key = f"val_{name}"
+            if val_key in hist.history and hist.history[val_key]:
+                hist.history[val_key][-1] = float_value
+            elif val_key in hist.history:
+                hist.history[val_key] = [float_value]
+            else:
+                hist.history[val_key] = [float("nan")] * (hist_len - 1) + [float_value]
+
+    csv_path = os.path.join(train_cfg.output_dir, "train_log.csv")
+    if hist_len and os.path.exists(csv_path):
+        try:
+            with open(csv_path, newline="") as f:
+                rows = list(csv.DictReader(f))
+            if rows:
+                fieldnames = rows[0].keys()
+                updated = False
+                for name, value in restored_metrics.items():
+                    val_key = f"val_{name}"
+                    if val_key in rows[-1]:
+                        rows[-1][val_key] = str(float(value))
+                        updated = True
+                if updated:
+                    with open(csv_path, "w", newline="") as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+        except Exception as e:
+            print(f"Failed to update CSV log with restored metrics: {e}")
 
     # save final
     final_path = os.path.join(train_cfg.output_dir, f"{model_name}_final.keras")
