@@ -110,7 +110,6 @@ def train(model_name: str = "deeplab_resnet50",
     if hist_len:
         for name, value in restored_metrics.items():
             float_value = float(value)
-            mlflow.log_metric(name, float_value, step=hist_len)
             mlflow.log_metric(f"val_{name}", float_value, step=hist_len)
 
             val_key = f"val_{name}"
