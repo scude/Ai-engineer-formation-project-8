@@ -82,8 +82,21 @@ def train(model_name: str = "unet_small",
             f"Invalid mixed precision policy '{train_cfg.precision_policy}'."
             " Accepted values include 'float32' and 'mixed_float16'."
         ) from exc
+<<<<<<< ours
+<<<<<<< ours
     current_policy = mixed_precision.global_policy().name
     print(f"Using mixed precision policy: {current_policy}")
+=======
+=======
+>>>>>>> theirs
+    policy = mixed_precision.global_policy()
+    current_policy = policy.name
+    compute_dtype = tf.dtypes.as_dtype(policy.compute_dtype)
+    print(f"Using mixed precision policy: {current_policy} (compute dtype: {compute_dtype.name})")
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 
     print(f"TF {tf.__version__} | GPUs: {tf.config.list_physical_devices('GPU')}")
     os.makedirs(train_cfg.output_dir, exist_ok=True)
@@ -107,6 +120,16 @@ def train(model_name: str = "unet_small",
 
     train_ds = _drop_weights(train_ds_with_weights)
     val_ds = _drop_weights(val_ds_with_weights)
+
+    if compute_dtype != tf.float32:
+        def _cast_inputs(ds):
+            return ds.map(
+                lambda x, y: (tf.cast(x, compute_dtype), y),
+                num_parallel_calls=tf.data.AUTOTUNE,
+            )
+
+        train_ds = _cast_inputs(train_ds)
+        val_ds = _cast_inputs(val_ds)
 
     # model
     input_shape = (data_cfg.height, data_cfg.width, 3)
@@ -196,7 +219,15 @@ def train(model_name: str = "unet_small",
         ),
     ]
     opt = build_optimizer(train_cfg.optimizer, train_cfg.lr)
+<<<<<<< ours
+<<<<<<< ours
     if train_cfg.precision_policy == "mixed_float16":
+=======
+    if compute_dtype == tf.float16:
+>>>>>>> theirs
+=======
+    if compute_dtype == tf.float16:
+>>>>>>> theirs
         # ``LossScaleOptimizer`` keeps gradients in float32 to avoid underflow when
         # using float16 tensors. Keras automatically applies dynamic loss scaling
         # for most built-in optimizers, but wrapping here guarantees the behaviour
