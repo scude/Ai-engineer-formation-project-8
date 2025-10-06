@@ -75,7 +75,15 @@ def train(model_name: str = "unet_small",
     })
 
     from tensorflow.keras import mixed_precision
-    mixed_precision.set_global_policy("float32")
+    try:
+        mixed_precision.set_global_policy(train_cfg.precision_policy)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid mixed precision policy '{train_cfg.precision_policy}'."
+            " Accepted values include 'float32' and 'mixed_float16'."
+        ) from exc
+    current_policy = mixed_precision.global_policy().name
+    print(f"Using mixed precision policy: {current_policy}")
 
     print(f"TF {tf.__version__} | GPUs: {tf.config.list_physical_devices('GPU')}")
     os.makedirs(train_cfg.output_dir, exist_ok=True)
@@ -188,6 +196,13 @@ def train(model_name: str = "unet_small",
         ),
     ]
     opt = build_optimizer(train_cfg.optimizer, train_cfg.lr)
+    if train_cfg.precision_policy == "mixed_float16":
+        # ``LossScaleOptimizer`` keeps gradients in float32 to avoid underflow when
+        # using float16 tensors. Keras automatically applies dynamic loss scaling
+        # for most built-in optimizers, but wrapping here guarantees the behaviour
+        # for custom optimizers as well.
+        if not isinstance(opt, mixed_precision.LossScaleOptimizer):
+            opt = mixed_precision.LossScaleOptimizer(opt)
     model.compile(optimizer=opt, loss=loss_fn, metrics=metrics)
 
     # MLflow
@@ -212,6 +227,7 @@ def train(model_name: str = "unet_small",
         "aug": vars(aug_cfg),
         "ignore_index": data_cfg.ignore_index,
         "loss": loss_choice,
+        "precision_policy": current_policy,
     }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
 
     monitor_metric = "val_masked_mIoU"
@@ -333,6 +349,17 @@ if __name__ == "__main__":
         action="store_true",
         help="Enable TensorFlow deterministic ops (may reduce performance and require extra scratch space)",
     )
+    p.add_argument(
+        "--precision_policy",
+        default="float32",
+        choices=["float32", "mixed_float16"],
+        help=(
+            "Mixed precision policy to apply. 'mixed_float16' keeps variables in float32 while "
+            "using float16 activations to reduce GPU memory usage. When enabling it, ensure the "
+            "optimizer supports loss scaling (the script wraps common optimizers with "
+            "tf.keras.mixed_precision.LossScaleOptimizer)."
+        ),
+    )
 
     # Aug params
     p.add_argument("--aug_enabled", type=int, default=1)
@@ -371,6 +398,7 @@ if __name__ == "__main__":
         arch=arch,
         loss=loss_choice,
         deterministic_ops=bool(args.deterministic_ops),
+        precision_policy=args.precision_policy,
     )
     aug_cfg = AugmentConfig(
         enabled=bool(args.aug_enabled), hflip=bool(args.hflip), vflip=bool(args.vflip),
