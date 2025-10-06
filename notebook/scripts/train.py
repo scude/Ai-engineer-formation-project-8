@@ -75,23 +75,13 @@ def train(model_name: str = "unet_small",
     })
 
     from tensorflow.keras import mixed_precision
-    requested_policy = (train_cfg.precision_policy or "auto").lower()
-    if requested_policy == "auto":
-        resolved_policy = "mixed_float16" if tf.config.list_physical_devices("GPU") else "float32"
-        if resolved_policy == "mixed_float16":
-            print("Auto precision policy selected: using mixed_float16 on GPU for lower memory usage.")
-        else:
-            print("Auto precision policy selected: defaulting to float32 (no GPU detected).")
-    else:
-        resolved_policy = requested_policy
     try:
-        mixed_precision.set_global_policy(resolved_policy)
+        mixed_precision.set_global_policy(train_cfg.precision_policy)
     except ValueError as exc:
         raise ValueError(
-            f"Invalid mixed precision policy '{resolved_policy}'."
-            " Accepted values include 'float32', 'mixed_float16' or 'auto'."
+            f"Invalid mixed precision policy '{train_cfg.precision_policy}'."
+            " Accepted values include 'float32' and 'mixed_float16'."
         ) from exc
-    train_cfg.precision_policy = resolved_policy
     policy = mixed_precision.global_policy()
     current_policy = policy.name
     compute_dtype = tf.dtypes.as_dtype(policy.compute_dtype)
