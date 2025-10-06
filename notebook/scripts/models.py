@@ -259,9 +259,16 @@ def unet_vgg16(
     ]
     bottleneck = base.get_layer("block5_conv3").output
 
-    x = decoder_block(bottleneck, skips[-1], 512, name="vgg_dec4")
-    x = decoder_block(x, skips[-2], 256, name="vgg_dec3")
-    x = decoder_block(x, skips[-3], 128, name="vgg_dec2")
+    # The original decoder mirrored VGG16's channel counts (512->64) which
+    # yields very large feature maps when training on 1024x512 crops.  Those
+    # activations easily blow up the GPU memory usage when the batch size is
+    # greater than one.  To keep the receptive field while reducing the memory
+    # footprint we progressively shrink the number of filters in the decoder.
+    # This keeps the model expressive enough for the task but lowers the peak
+    # tensor size so the training no longer OOMs on common GPUs.
+    x = decoder_block(bottleneck, skips[-1], 256, name="vgg_dec4")
+    x = decoder_block(x, skips[-2], 128, name="vgg_dec3")
+    x = decoder_block(x, skips[-3], 96, name="vgg_dec2")
     x = decoder_block(x, skips[-4], 64, name="vgg_dec1")
     x = double_conv_block(x, 64, name="vgg_final")
 
