@@ -30,6 +30,7 @@ class TrainConfig:
     arch: str = "unet_small"
     loss: str = "ce"
     deterministic_ops: bool = False
+    precision_policy: str = "float32"
 
 @dataclass
 class AugmentConfig:
