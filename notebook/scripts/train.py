@@ -11,7 +11,7 @@ import tensorflow as tf
 from tensorflow import keras
 from .config import DataConfig, TrainConfig, AugmentConfig
 from .data import build_dataset, prepare_labels_for_loss
-from .models import build_model
+from .models import AVAILABLE_MODELS, build_model
 from .metrics import masked_mean_iou, masked_pixel_accuracy
 from .mlflow_utils import init_mlflow, start_run, KerasMlflowLogger
 import mlflow, mlflow.keras
@@ -35,7 +35,7 @@ def build_optimizer(name: str, lr: float):
     if name == "sgd": return keras.optimizers.SGD(lr, momentum=0.9, nesterov=True)
     raise ValueError(f"Unknown optimizer: {name}")
 
-def train(model_name: str = "deeplab_resnet50",
+def train(model_name: str = "unet_small",
           data_cfg: DataConfig = DataConfig(),
           train_cfg: TrainConfig = TrainConfig(),
           aug_cfg: AugmentConfig = AugmentConfig()):
@@ -64,7 +64,7 @@ def train(model_name: str = "deeplab_resnet50",
 
     # model
     input_shape = (data_cfg.height, data_cfg.width, 3)
-    model = build_model(model_name, input_shape, data_cfg.num_classes)
+    model = build_model(model_name, data_cfg.num_classes, input_shape)
 
     # compile
     base_loss = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
@@ -187,8 +187,7 @@ def train(model_name: str = "deeplab_resnet50",
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--model", default="deeplab_resnet50",
-                   choices=["deeplab_resnet50","deeplab_mobilenetv2","unet_small","fast_scnn"])
+    p.add_argument("--model", default="unet_small", choices=list(AVAILABLE_MODELS))
     p.add_argument("--data_root", default="../data")
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--width", type=int, default=1024)
