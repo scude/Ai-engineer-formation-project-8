@@ -66,7 +66,8 @@ def train(model_name: str = "unet_small",
     train_cfg.arch = model_name
     # reproducibility
     tf.keras.utils.set_random_seed(data_cfg.seed)
-    tf.config.experimental.enable_op_determinism()
+    if train_cfg.deterministic_ops:
+        tf.config.experimental.enable_op_determinism()
     # désactive JIT/XLA et layout optimizer pour éviter les messages "layout failed"
     tf.config.optimizer.set_jit(False)
     tf.config.optimizer.set_experimental_options({
@@ -327,6 +328,11 @@ if __name__ == "__main__":
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--optimizer", default="adam", choices=["adam","adamw","sgd"])
     p.add_argument("--loss", default="ce", choices=["ce", "dice", "ce+dice"])
+    p.add_argument(
+        "--deterministic_ops",
+        action="store_true",
+        help="Enable TensorFlow deterministic ops (may reduce performance and require extra scratch space)",
+    )
 
     # Aug params
     p.add_argument("--aug_enabled", type=int, default=1)
@@ -364,6 +370,7 @@ if __name__ == "__main__":
         optimizer=args.optimizer,
         arch=arch,
         loss=loss_choice,
+        deterministic_ops=bool(args.deterministic_ops),
     )
     aug_cfg = AugmentConfig(
         enabled=bool(args.aug_enabled), hflip=bool(args.hflip), vflip=bool(args.vflip),

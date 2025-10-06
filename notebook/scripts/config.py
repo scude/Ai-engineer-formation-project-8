@@ -29,6 +29,7 @@ class TrainConfig:
     exp_name: str = "cityscapes-seg-8cls"
     arch: str = "unet_small"
     loss: str = "ce"
+    deterministic_ops: bool = False
 
 @dataclass
 class AugmentConfig:
