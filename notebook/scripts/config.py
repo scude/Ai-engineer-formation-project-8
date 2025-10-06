@@ -30,7 +30,7 @@ class TrainConfig:
     arch: str = "unet_small"
     loss: str = "ce"
     deterministic_ops: bool = False
-    precision_policy: str = "float32"
+    precision_policy: str = "auto"  # "auto" chooses mixed_float16 on GPU, float32 otherwise
 
 @dataclass
 class AugmentConfig:
