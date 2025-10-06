@@ -7,25 +7,48 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
 import re, shutil, argparse, csv, datetime
+from typing import Callable
 import tensorflow as tf
 from tensorflow import keras
 from .config import DataConfig, TrainConfig, AugmentConfig
 from .data import build_dataset, prepare_labels_for_loss
 from .models import AVAILABLE_MODELS, build_model
-from .metrics import masked_mean_iou, masked_pixel_accuracy
+from .metrics import masked_mean_iou, masked_pixel_accuracy, dice_coef_wrapper
 from .mlflow_utils import init_mlflow, start_run, KerasMlflowLogger
 import mlflow, mlflow.keras
 
-CKPT_RE = re.compile(r"weights\.(\d+)-([0-9]*\.[0-9]+)\.keras$")
+def _canonical_arch(name: str) -> str:
+    """Normalise architecture aliases to the registered model keys."""
 
-def _best_ckpt(path: str):
-    if not os.path.isdir(path): return None, -1.0
+    if not name:
+        raise ValueError("Architecture name must be a non-empty string")
+    canonical = name.strip().lower().replace("-", "_")
+    if canonical not in AVAILABLE_MODELS:
+        raise ValueError(f"Unknown model architecture: {name}")
+    return canonical
+
+
+def _checkpoint_regex(monitor: str) -> re.Pattern[str]:
+    escaped = re.escape(monitor)
+    return re.compile(rf"([\w\-]+)\.{escaped}\.(\d+)-([0-9]*\.[0-9]+)\.keras$")
+
+
+CKPT_RE_CACHE: dict[str, re.Pattern[str]] = {}
+
+
+def _best_ckpt(path: str, monitor: str):
+    if not os.path.isdir(path):
+        return None, -1.0
+    if monitor not in CKPT_RE_CACHE:
+        CKPT_RE_CACHE[monitor] = _checkpoint_regex(monitor)
+    pattern = CKPT_RE_CACHE[monitor]
     best, score = None, -1.0
     for f in os.listdir(path):
-        m = CKPT_RE.match(f)
+        m = pattern.match(f)
         if m:
-            s = float(m.group(2))
-            if s > score: best, score = os.path.join(path, f), s
+            s = float(m.group(3))
+            if s > score:
+                best, score = os.path.join(path, f), s
     return best, score
 
 def build_optimizer(name: str, lr: float):
@@ -39,6 +62,8 @@ def train(model_name: str = "unet_small",
           data_cfg: DataConfig = DataConfig(),
           train_cfg: TrainConfig = TrainConfig(),
           aug_cfg: AugmentConfig = AugmentConfig()):
+    model_name = _canonical_arch(model_name)
+    train_cfg.arch = model_name
     # reproducibility
     tf.keras.utils.set_random_seed(data_cfg.seed)
     tf.config.experimental.enable_op_determinism()
@@ -57,34 +82,112 @@ def train(model_name: str = "unet_small",
     os.makedirs(ckpt_root, exist_ok=True)
 
     # data
-    train_ds = build_dataset(data_cfg, aug_cfg, split="train", training=True)
-    val_ds   = build_dataset(data_cfg, aug_cfg.__class__(enabled=False), split="val", training=False)  # no aug at val
-    xb, yb, wb = next(iter(train_ds))
-    print(f"probe -> x:{xb.shape} {xb.dtype} | y:{yb.shape} {yb.dtype} | w:{wb.shape} {wb.dtype}")
+    train_ds_with_weights = build_dataset(data_cfg, aug_cfg, split="train", training=True)
+    val_ds_with_weights = build_dataset(
+        data_cfg,
+        aug_cfg.__class__(enabled=False),
+        split="val",
+        training=False,
+    )
+
+    for xb, yb, wb in train_ds_with_weights.take(1):
+        print(f"probe -> x:{xb.shape} {xb.dtype} | y:{yb.shape} {yb.dtype} | w:{wb.shape} {wb.dtype}")
+
+    def _drop_weights(ds):
+        return ds.map(lambda x, y, w: (x, y), num_parallel_calls=tf.data.AUTOTUNE)
+
+    train_ds = _drop_weights(train_ds_with_weights)
+    val_ds = _drop_weights(val_ds_with_weights)
 
     # model
     input_shape = (data_cfg.height, data_cfg.width, 3)
     model = build_model(model_name, data_cfg.num_classes, input_shape)
 
     # compile
-    base_loss = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    base_loss = keras.losses.SparseCategoricalCrossentropy(
+        from_logits=True,
+        reduction=tf.keras.losses.Reduction.NONE,
+    )
 
-    def loss(y_true, y_pred):
-        y_true = prepare_labels_for_loss(y_true, data_cfg.ignore_index)
-        return base_loss(y_true, y_pred)
+    ignore_index = data_cfg.ignore_index
+    num_classes = data_cfg.num_classes
+
+    def _cross_entropy_component(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        y_true = tf.cast(y_true, tf.int32)
+        valid_mask = tf.not_equal(y_true, ignore_index)
+        y_true_clean = prepare_labels_for_loss(y_true, ignore_index)
+        per_pixel = base_loss(y_true_clean, y_pred)
+        mask = tf.cast(valid_mask, per_pixel.dtype)
+        per_pixel = per_pixel * mask
+        per_example = tf.reduce_sum(per_pixel, axis=[1, 2])
+        valid_counts = tf.reduce_sum(mask, axis=[1, 2])
+        per_example = tf.where(
+            valid_counts > 0,
+            per_example / tf.maximum(valid_counts, tf.ones_like(valid_counts)),
+            tf.zeros_like(per_example),
+        )
+        return per_example
+
+    def _dice_component(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        y_true = tf.cast(y_true, tf.int32)
+        valid_mask = tf.not_equal(y_true, ignore_index)
+        y_true_clean = prepare_labels_for_loss(y_true, ignore_index)
+        y_true_one_hot = tf.one_hot(y_true_clean, depth=num_classes, dtype=tf.float32)
+        probs = tf.nn.softmax(y_pred, axis=-1)
+        mask = tf.cast(valid_mask, tf.float32)[..., tf.newaxis]
+
+        y_true_one_hot = y_true_one_hot * mask
+        probs = probs * mask
+
+        intersection = tf.reduce_sum(y_true_one_hot * probs, axis=[1, 2])
+        totals = tf.reduce_sum(y_true_one_hot + probs, axis=[1, 2])
+        smooth = 1e-6
+        dice_per_class = tf.where(
+            totals > 0.0,
+            (2.0 * intersection + smooth) / (totals + smooth),
+            tf.zeros_like(totals),
+        )
+        valid_classes = tf.reduce_sum(tf.cast(totals > 0.0, tf.float32), axis=-1)
+        dice_scores = tf.where(
+            valid_classes > 0.0,
+            tf.reduce_sum(dice_per_class, axis=-1) / tf.maximum(valid_classes, tf.ones_like(valid_classes)),
+            tf.zeros_like(valid_classes),
+        )
+        return 1.0 - dice_scores
+
+    loss_choice = (train_cfg.loss or "ce").lower()
+
+    if loss_choice == "ce":
+        loss_fn: Callable[[tf.Tensor, tf.Tensor], tf.Tensor] = _cross_entropy_component
+    elif loss_choice == "dice":
+        loss_fn = _dice_component
+    elif loss_choice == "ce+dice":
+        def loss_fn(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+            ce = _cross_entropy_component(y_true, y_pred)
+            dl = _dice_component(y_true, y_pred)
+            return 0.5 * ce + 0.5 * dl
+    else:
+        raise ValueError(f"Unsupported loss choice: {train_cfg.loss}")
+
+    train_cfg.loss = loss_choice
+
     metrics = [
         keras.metrics.MeanMetricWrapper(
             masked_pixel_accuracy,
             name="pix_acc",
-            ignore_index=data_cfg.ignore_index,
+            ignore_index=ignore_index,
         ),
         masked_mean_iou(
-            num_classes=data_cfg.num_classes,
-            ignore_index=data_cfg.ignore_index,
+            num_classes=num_classes,
+            ignore_index=ignore_index,
         )(),
+        keras.metrics.MeanMetricWrapper(
+            dice_coef_wrapper(num_classes=num_classes, ignore_index=ignore_index),
+            name="dice_coef",
+        ),
     ]
     opt = build_optimizer(train_cfg.optimizer, train_cfg.lr)
-    model.compile(optimizer=opt, loss=loss, metrics=metrics)
+    model.compile(optimizer=opt, loss=loss_fn, metrics=metrics)
 
     # MLflow
     init_mlflow(train_cfg.exp_name)
@@ -97,18 +200,43 @@ def train(model_name: str = "unet_small",
     max_train_samples = getattr(train_cfg, "max_train_samples", None)
     max_val_samples = getattr(train_cfg, "max_val_samples", None)
     mlf_logger = KerasMlflowLogger({
-        "model": model_name, "height": data_cfg.height, "width": data_cfg.width,
-        "batch_size": data_cfg.batch_size, "lr": train_cfg.lr, "epochs": train_cfg.epochs,
-        "optimizer": train_cfg.optimizer, "aug": vars(aug_cfg), "ignore_index": data_cfg.ignore_index
+        "arch": model_name,
+        "model": model_name,
+        "height": data_cfg.height,
+        "width": data_cfg.width,
+        "batch_size": data_cfg.batch_size,
+        "lr": train_cfg.lr,
+        "epochs": train_cfg.epochs,
+        "optimizer": train_cfg.optimizer,
+        "aug": vars(aug_cfg),
+        "ignore_index": data_cfg.ignore_index,
+        "loss": loss_choice,
     }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
 
-    callbacks = [keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(ckpt_dir, "weights.{epoch:03d}-{val_masked_mIoU:.4f}.keras"),
-        monitor="val_masked_mIoU", mode="max", save_best_only=True
-    ), keras.callbacks.EarlyStopping(monitor="val_masked_mIoU", mode="max",
-                                     patience=train_cfg.early_stop_patience, restore_best_weights=True),
+    monitor_metric = "val_masked_mIoU"
+    if loss_choice in {"dice", "ce+dice"}:
+        monitor_metric = "val_dice_coef"
+
+    callbacks = [
+        keras.callbacks.ModelCheckpoint(
+            filepath=os.path.join(
+                ckpt_dir,
+                f"{model_name}.{monitor_metric}.{{epoch:03d}}-{{{monitor_metric}:.4f}}.keras",
+            ),
+            monitor=monitor_metric,
+            mode="max",
+            save_best_only=True,
+        ),
+        keras.callbacks.EarlyStopping(
+            monitor=monitor_metric,
+            mode="max",
+            patience=train_cfg.early_stop_patience,
+            restore_best_weights=True,
+        ),
         keras.callbacks.TerminateOnNaN(),
-        keras.callbacks.CSVLogger(os.path.join(train_cfg.output_dir, "train_log.csv")), mlf_logger]
+        keras.callbacks.CSVLogger(os.path.join(train_cfg.output_dir, "train_log.csv")),
+        mlf_logger,
+    ]
 
     hist = model.fit(train_ds, validation_data=val_ds, epochs=train_cfg.epochs, callbacks=callbacks, verbose=1)
 
@@ -160,12 +288,12 @@ def train(model_name: str = "unet_small",
     print(f"saved -> {final_path}")
 
     # best ckpt copy
-    best_path, best_score = _best_ckpt(ckpt_dir)
+    best_path, best_score = _best_ckpt(ckpt_dir, monitor_metric)
     best_export = None
     if best_path:
         best_export = os.path.join(train_cfg.output_dir, f"{model_name}_best.keras")
         shutil.copy2(best_path, best_export)
-        print(f"best -> {os.path.basename(best_path)} (mIoU={best_score:.4f}) | exported: {best_export}")
+        print(f"best -> {os.path.basename(best_path)} ({monitor_metric}={best_score:.4f}) | exported: {best_export}")
 
     # log artifacts
     mlflow.log_artifact(os.path.join(train_cfg.output_dir, "train_log.csv"), artifact_path="logs")
@@ -175,7 +303,7 @@ def train(model_name: str = "unet_small",
         try:
             bm = keras.models.load_model(best_export, compile=False)
             mlflow.keras.log_model(bm, artifact_path="best_model")
-            mlflow.log_metric("best_val_masked_mIoU", float(best_score))
+            mlflow.log_metric(f"best_{monitor_metric}", float(best_score))
         except Exception as e:
             print("mlflow keras flavor failed:", e)
 
@@ -187,7 +315,8 @@ def train(model_name: str = "unet_small",
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--model", default="unet_small", choices=list(AVAILABLE_MODELS))
+    p.add_argument("--model", default=None, help="Legacy alias for --arch")
+    p.add_argument("--arch", default=None, help="Model architecture to train")
     p.add_argument("--data_root", default="../data")
     p.add_argument("--height", type=int, default=512)
     p.add_argument("--width", type=int, default=1024)
@@ -197,6 +326,7 @@ if __name__ == "__main__":
     p.add_argument("--epochs", type=int, default=60)
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--optimizer", default="adam", choices=["adam","adamw","sgd"])
+    p.add_argument("--loss", default="ce", choices=["ce", "dice", "ce+dice"])
 
     # Aug params
     p.add_argument("--aug_enabled", type=int, default=1)
@@ -214,17 +344,31 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
+    arch_arg = args.arch or args.model or "unet_small"
+    try:
+        arch = _canonical_arch(arch_arg)
+    except ValueError as exc:
+        p.error(str(exc))
+
+    loss_choice = args.loss.lower()
+
     data_cfg = DataConfig(
         data_root=args.data_root, height=args.height, width=args.width,
         batch_size=args.batch_size,
         max_train_samples=args.max_train_samples,
         max_val_samples=args.max_val_samples
     )
-    train_cfg = TrainConfig(lr=args.lr, epochs=args.epochs, optimizer=args.optimizer)
+    train_cfg = TrainConfig(
+        lr=args.lr,
+        epochs=args.epochs,
+        optimizer=args.optimizer,
+        arch=arch,
+        loss=loss_choice,
+    )
     aug_cfg = AugmentConfig(
         enabled=bool(args.aug_enabled), hflip=bool(args.hflip), vflip=bool(args.vflip),
         random_rotate_deg=args.rotate, random_scale_min=args.scale_min, random_scale_max=args.scale_max,
         random_crop=bool(args.random_crop), brightness_delta=args.brightness, contrast_delta=args.contrast,
         saturation_delta=args.saturation, hue_delta=args.hue, gaussian_noise_std=args.noise_std
     )
-    train(args.model, data_cfg, train_cfg, aug_cfg)
+    train(arch, data_cfg, train_cfg, aug_cfg)

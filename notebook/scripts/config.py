@@ -27,6 +27,8 @@ class TrainConfig:
     early_stop_patience: int = 10
     output_dir: str = "artifacts"
     exp_name: str = "cityscapes-seg-8cls"
+    arch: str = "unet_small"
+    loss: str = "ce"
 
 @dataclass
 class AugmentConfig:
