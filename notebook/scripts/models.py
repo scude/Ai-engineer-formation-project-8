@@ -266,11 +266,11 @@ def unet_vgg16(
     # footprint we progressively shrink the number of filters in the decoder.
     # This keeps the model expressive enough for the task but lowers the peak
     # tensor size so the training no longer OOMs on common GPUs.
-    x = decoder_block(bottleneck, skips[-1], 256, name="vgg_dec4")
-    x = decoder_block(x, skips[-2], 128, name="vgg_dec3")
-    x = decoder_block(x, skips[-3], 96, name="vgg_dec2")
-    x = decoder_block(x, skips[-4], 64, name="vgg_dec1")
-    x = double_conv_block(x, 64, name="vgg_final")
+    x = decoder_block(bottleneck, skips[-1], 128, name="vgg_dec4")
+    x = decoder_block(x, skips[-2], 64, name="vgg_dec3")
+    x = decoder_block(x, skips[-3], 48, name="vgg_dec2")
+    x = decoder_block(x, skips[-4], 36, name="vgg_dec1")
+    x = double_conv_block(x, 36, name="vgg_final")
 
     logits = layers.Conv2D(num_classes, 1, name="logits")(x)
     return keras.Model(base.input, logits, name="unet_vgg16")
