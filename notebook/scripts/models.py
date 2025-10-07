@@ -328,10 +328,10 @@ def yolov9_seg(
 
     neck = conv_bn_act(stage4, 512, kernel_size=3, name="neck")
 
-    x = decoder_block(neck, stage3, 256, name="yolo_dec3")
-    x = decoder_block(x, stage2, 128, name="yolo_dec2")
-    x = decoder_block(x, stage1, 96, name="yolo_dec1")
-    x = decoder_block(x, stem, 64, name="yolo_dec0")
+    x = decoder_block(neck, stage3, 128, name="yolo_dec3")
+    x = decoder_block(x, stage2, 64, name="yolo_dec2")
+    x = decoder_block(x, stage1, 48, name="yolo_dec1")
+    x = decoder_block(x, stem, 32, name="yolo_dec0")
 
     logits = layers.Conv2D(num_classes, 1, name="logits")(x)
     return keras.Model(inputs, logits, name="yolov9_seg")
