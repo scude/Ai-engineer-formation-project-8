@@ -3,9 +3,6 @@ data/
 mlruns/
 logs/
 
-# App
-app/models/
-
 # Notebooks
 .ipynb_checkpoints/
 artifacts/
