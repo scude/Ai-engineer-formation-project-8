@@ -1,0 +1,15 @@
+body {
+  background-color: #f8f9fa;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.card-img-top {
+  object-fit: contain;
+}

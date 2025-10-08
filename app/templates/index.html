@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<ul class="nav nav-tabs" id="demo-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="segmentation-tab" data-bs-toggle="tab" data-bs-target="#segmentation" type="button" role="tab" aria-controls="segmentation" aria-selected="true">
+      Segmentation
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="augmentation-tab" data-bs-toggle="tab" data-bs-target="#augmentation" type="button" role="tab" aria-controls="augmentation" aria-selected="false">
+      Augmentation
+    </button>
+  </li>
+</ul>
+<div class="tab-content pt-4" id="demo-tabs-content">
+  <div class="tab-pane fade show active" id="segmentation" role="tabpanel" aria-labelledby="segmentation-tab" tabindex="0">
+    <form id="segmentation-form" class="mb-4" enctype="multipart/form-data">
+      <div class="row g-3 align-items-center">
+        <div class="col-auto">
+          <label for="segmentation-image" class="col-form-label">Image</label>
+        </div>
+        <div class="col-auto">
+          <input class="form-control" type="file" accept="image/*" id="segmentation-image" name="image" required />
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-primary" type="submit">Run segmentation</button>
+        </div>
+      </div>
+    </form>
+    <div class="row" id="segmentation-results" hidden>
+      <div class="col-md-4 mb-3">
+        <div class="card h-100">
+          <div class="card-header">Original</div>
+          <img id="segmentation-original" class="card-img-top" alt="Original" />
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="card h-100">
+          <div class="card-header">Mask</div>
+          <img id="segmentation-mask" class="card-img-top" alt="Mask" />
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="card h-100">
+          <div class="card-header">Overlay</div>
+          <img id="segmentation-overlay" class="card-img-top" alt="Overlay" />
+        </div>
+      </div>
+    </div>
+    <div class="legend mt-3">
+      <h5>Legend</h5>
+      <ul class="list-unstyled row">
+        {% for name, color in legend %}
+        <li class="col-md-3 d-flex align-items-center mb-2">
+          <span class="legend-swatch me-2" style="background-color: {{ color }}"></span>
+          <span>{{ name }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="tab-pane fade" id="augmentation" role="tabpanel" aria-labelledby="augmentation-tab" tabindex="0">
+    <form id="augmentation-form" class="mb-4" enctype="multipart/form-data">
+      <div class="row g-3 align-items-center">
+        <div class="col-auto">
+          <label for="augmentation-image" class="col-form-label">Image</label>
+        </div>
+        <div class="col-auto">
+          <input class="form-control" type="file" accept="image/*" id="augmentation-image" name="image" required />
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-primary" type="submit">Preview augmentations</button>
+        </div>
+      </div>
+    </form>
+    <div id="augmentation-results" class="row g-3"></div>
+  </div>
+</div>
+<div class="alert alert-danger d-none" id="error-alert"></div>
+{% endblock %}

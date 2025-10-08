@@ -1,2 +1,5 @@
 albumentations
 opencv-python-headless
+Pillow
+numpy
+tensorflow
