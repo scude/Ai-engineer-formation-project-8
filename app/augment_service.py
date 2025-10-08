@@ -20,6 +20,13 @@ class AugmentedImage:
     name: str
     image: Image.Image
 
+@dataclass(frozen=True)
+class AugmentationPreview:
+    """Container for the original and augmented images."""
+
+    original: Image.Image
+    augmentations: list[AugmentedImage]
+
 
 class AugmentationService:
     """Generate augmentation previews compatible with the training pipeline."""
@@ -38,8 +45,8 @@ class AugmentationService:
         with BytesIO(data) as buffer:
             return Image.open(buffer).convert("RGB")
 
-    def generate(self, data: bytes, samples: int = 6) -> list[AugmentedImage]:
-        """Produce a list of augmented versions of the given image."""
+    def generate(self, data: bytes, samples: int = 6) -> AugmentationPreview:
+        """Produce a preview containing the original and augmented versions."""
 
         base_image = self._read_image(data)
         image_array = np.asarray(base_image)
@@ -49,4 +56,4 @@ class AugmentationService:
             augmented = self._pipeline(image=image_array)
             aug_img = Image.fromarray(augmented["image"])
             augmented_images.append(AugmentedImage(name=f"Augmentation {idx + 1}", image=aug_img))
-        return augmented_images
+        return AugmentationPreview(original=base_image, augmentations=augmented_images)

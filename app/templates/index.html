@@ -23,8 +23,13 @@
         <div class="col-auto">
           <input class="form-control" type="file" accept="image/*" id="segmentation-image" name="image" required />
         </div>
-        <div class="col-auto">
-          <button class="btn btn-primary" type="submit">Run segmentation</button>
+        <div class="col-auto d-flex align-items-center gap-2">
+          <button class="btn btn-primary" id="segmentation-submit" type="submit">
+            Run segmentation
+          </button>
+          <div class="spinner-border spinner-border-sm text-primary d-none" id="segmentation-loader" role="status">
+            <span class="visually-hidden">Processing…</span>
+          </div>
         </div>
       </div>
     </form>
@@ -69,8 +74,13 @@
         <div class="col-auto">
           <input class="form-control" type="file" accept="image/*" id="augmentation-image" name="image" required />
         </div>
-        <div class="col-auto">
-          <button class="btn btn-primary" type="submit">Preview augmentations</button>
+        <div class="col-auto d-flex align-items-center gap-2">
+          <button class="btn btn-primary" id="augmentation-submit" type="submit">
+            Preview augmentations
+          </button>
+          <div class="spinner-border spinner-border-sm text-primary d-none" id="augmentation-loader" role="status">
+            <span class="visually-hidden">Processing…</span>
+          </div>
         </div>
       </div>
     </form>

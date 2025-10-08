@@ -42,10 +42,12 @@ def augment() -> Response:
         return jsonify({"error": "Image file is required"}), HTTPStatus.BAD_REQUEST
 
     service = current_app.extensions["augmentation_service"]
-    augmented = service.generate(file.read())
+    preview = service.generate(file.read())
     payload = {
+        "original": image_to_data_url(preview.original),
         "augmentations": [
-            {"name": item.name, "image": image_to_data_url(item.image)} for item in augmented
+            {"name": item.name, "image": image_to_data_url(item.image)}
+            for item in preview.augmentations
         ]
     }
     return jsonify(payload)
