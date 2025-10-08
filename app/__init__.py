@@ -23,8 +23,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     model_path = Path(MODEL_PATH)
     if not model_path.exists():
         raise FileNotFoundError(f"Segmentation model not found at {model_path}")
-
-    model = keras.models.load_model(model_path)
+    model = keras.models.load_model(model_path, compile=False)
     app.extensions["segmentation_service"] = SegmentationService(model=model)
     app.extensions["augmentation_service"] = AugmentationService()
 
