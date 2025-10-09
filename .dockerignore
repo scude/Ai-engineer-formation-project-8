@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Notebooks and experiments (keep scripts!)
+notebook/
+!notebook/scripts/
+*.ipynb
+
+# Data and artifacts
+artifacts/
+data/
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build caches
+.cache/
+pytest_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Misc
+*.swp
