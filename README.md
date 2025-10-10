@@ -53,5 +53,8 @@ Pour vérifier que tout le code se compile correctement :
 ```bash
 python -m compileall app
 ```
+heroku container:push web -a city-segmentation
+heroku container:release web -a city-segmentation
+heroku logs -t -a city-segmentation
 
 Bonne exploration !

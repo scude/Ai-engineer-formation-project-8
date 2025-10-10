@@ -8,7 +8,7 @@ from typing import Iterable
 import cv2
 import numpy as np
 from PIL import Image
-from tensorflow import keras
+import tensorflow as tf
 
 from .config import CLASS_NAMES, PALETTE
 
@@ -25,7 +25,7 @@ class SegmentationResult:
 class SegmentationService:
     """High level service that performs image segmentation with a Keras model."""
 
-    def __init__(self, model: keras.Model) -> None:
+    def __init__(self, model: tf.keras.Model) -> None:
         self._model = model
         input_shape = getattr(self._model, "input_shape", None)
         if not isinstance(input_shape, Iterable) or len(input_shape) != 4:

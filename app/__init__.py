@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask
-from tensorflow import keras
+import tensorflow as tf
 
 from .config import APP_STATIC_FOLDER, APP_TEMPLATE_FOLDER, MODEL_PATH
 from .inference import SegmentationService
@@ -24,7 +24,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     if not model_path.exists():
         raise FileNotFoundError(f"Segmentation model not found at {model_path}")
 
-    model = keras.models.load_model(model_path)
+    model = tf.keras.models.load_model(model_path, compile=False)
     app.extensions["segmentation_service"] = SegmentationService(model=model)
     app.extensions["augmentation_service"] = AugmentationService()
 
