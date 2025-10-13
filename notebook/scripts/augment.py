@@ -70,21 +70,37 @@ def _build_albu_pipeline(
 
     transforms = []
 
-    scale_min = min(max(cfg.random_scale_min, 0.0), 1.0)
-    scale_max = min(max(cfg.random_scale_max, scale_min), 1.0)
+    scale_min = max(cfg.random_scale_min, 0.0)
+    scale_max = max(cfg.random_scale_max, scale_min)
 
-    if cfg.random_crop or scale_min < 1.0 or scale_max < 1.0:
+    crop_scale_max = min(scale_max, 1.0)
+    if cfg.random_crop or scale_min < 1.0 or crop_scale_max < 1.0:
+        crop_scale_min = min(scale_min, crop_scale_max)
         # Match the crop aspect ratio to the requested output size so that the
         # subsequent resize step does not stretch the image horizontally or
         aspect_ratio = float(width) / float(height)
         transforms.append(
             A.RandomResizedCrop(
                 size=(height, width),
-                scale=(scale_min, scale_max),
+                scale=(crop_scale_min, crop_scale_max),
                 ratio=(aspect_ratio, aspect_ratio),
                 interpolation=cv2.INTER_LINEAR,
                 mask_interpolation=cv2.INTER_NEAREST,
                 p=1.0,
+            )
+        )
+
+    if scale_max > 1.0:
+        transforms.append(
+            A.Affine(
+                scale=(max(1.0, scale_min), scale_max),
+                keep_ratio=True,
+                fit_output=False,
+                mode=cv2.BORDER_CONSTANT,
+                cval=0.0,
+                cval_mask=ignore_index,
+                interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,
             )
         )
 
