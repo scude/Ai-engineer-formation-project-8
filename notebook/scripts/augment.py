@@ -65,8 +65,7 @@ def _build_albu_pipeline(
     if cfg.random_crop or scale_min < 1.0 or scale_max < 1.0:
         # Match the crop aspect ratio to the requested output size so that the
         # subsequent resize step does not stretch the image horizontally or
-        # vertically.
-        aspect_ratio = float(height) / float(width)
+        aspect_ratio = float(width) / float(height)
         transforms.append(
             A.RandomResizedCrop(
                 size=(height, width),
