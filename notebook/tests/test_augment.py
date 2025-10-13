@@ -42,14 +42,14 @@ def test_color_jitter_output_not_black():
     assert np.any(aug_image_np < 1.0), "Augmented image should not be all ones"
 
 
-def test_random_scale_crop_keeps_mask_alignment():
+def test_random_resized_crop_keeps_mask_alignment():
     np.random.seed(1234)
 
     cfg = AugmentConfig(
         enabled=True,
         random_crop=True,
         random_scale_min=0.5,
-        random_scale_max=1.5,
+        random_scale_max=1.0,
         hflip=False,
         vflip=False,
         random_rotate_deg=0.0,

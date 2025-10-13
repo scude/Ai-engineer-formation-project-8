@@ -396,6 +396,7 @@ if __name__ == "__main__":
     p.add_argument("--saturation", type=float, default=default_aug.saturation_delta)
     p.add_argument("--hue", type=float, default=default_aug.hue_delta)
     p.add_argument("--noise_std", type=float, default=default_aug.gaussian_noise_std)
+    p.add_argument("--sepia_p", type=float, default=default_aug.sepia_probability)
 
     args = p.parse_args()
 
@@ -426,6 +427,7 @@ if __name__ == "__main__":
         enabled=bool(args.aug_enabled), hflip=bool(args.hflip), vflip=bool(args.vflip),
         random_rotate_deg=args.rotate, random_scale_min=args.scale_min, random_scale_max=args.scale_max,
         random_crop=bool(args.random_crop), brightness_delta=args.brightness, contrast_delta=args.contrast,
-        saturation_delta=args.saturation, hue_delta=args.hue, gaussian_noise_std=args.noise_std
+        saturation_delta=args.saturation, hue_delta=args.hue, gaussian_noise_std=args.noise_std,
+        sepia_probability=args.sepia_p,
     )
     train(arch, data_cfg, train_cfg, aug_cfg)

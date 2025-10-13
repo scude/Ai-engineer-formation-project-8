@@ -12,134 +12,43 @@ from .config import AugmentConfig
 from .data_utils import resize_image_and_mask
 
 
-class RandomScaleCrop(A.DualTransform):
-    """Albumentations transform mimicking the TF random scale+crop pipeline."""
+class SoftSepia(A.ImageOnlyTransform):
+    """Blend a sepia-toned version of the image with the original.
 
-    def __init__(
-        self,
-        scale_min: float,
-        scale_max: float,
-        target_height: int,
-        target_width: int,
-        always_apply: bool = False,
-        p: float = 1.0,
-    ) -> None:
-        super().__init__(always_apply=always_apply, p=p)
-        self.scale_min = scale_min
-        self.scale_max = scale_max
-        self.target_height = target_height
-        self.target_width = target_width
+    Albumentations' :class:`~albumentations.augmentations.transforms.ToSepia`
+    applies a full-strength sepia filter. This transform keeps the original
+    image as the base layer and blends in a sepia version with a randomly
+    sampled opacity, resulting in a gentler effect that better matches the
+    user's expectations.
+    """
 
-    def apply(self, image, **params):
-        params = self._ensure_valid_params(image, params)
-        return self._apply(image, params, cv2.INTER_LINEAR)
+    def __init__(self, alpha_range: Tuple[float, float], always_apply: bool = False, p: float = 0.5):
+        super().__init__(always_apply, p)
+        low, high = alpha_range
+        low, high = sorted((float(low), float(high)))
+        self.alpha_range = (
+            max(0.0, low),
+            min(1.0, high),
+        )
+        self._kernel = np.array(
+            [
+                [0.393, 0.769, 0.189],
+                [0.349, 0.686, 0.168],
+                [0.272, 0.534, 0.131],
+            ],
+            dtype=np.float32,
+        )
 
-    def apply_to_mask(self, mask, **params):
-        params = self._ensure_valid_params(mask, params)
-        return self._apply(mask, params, cv2.INTER_NEAREST)
+    def apply(self, image: np.ndarray, alpha: float = 0.3, **params) -> np.ndarray:  # type: ignore[override]
+        sepia_image = image.astype(np.float32) @ self._kernel.T
+        sepia_image = np.clip(sepia_image, 0, 255).astype(np.uint8)
+        blended = cv2.addWeighted(image, 1.0 - alpha, sepia_image, alpha, 0.0)
+        return blended
 
-    def _sample_params(self, height: int, width: int) -> dict:
-        scale = float(np.random.uniform(self.scale_min, self.scale_max))
-        nh = max(1, int(round(height * scale)))
-        nw = max(1, int(round(width * scale)))
-        max_top = max(nh - self.target_height, 0)
-        max_left = max(nw - self.target_width, 0)
-        top = int(np.random.randint(0, max_top + 1)) if max_top > 0 else 0
-        left = int(np.random.randint(0, max_left + 1)) if max_left > 0 else 0
-        return {
-            "scale": scale,
-            "nh": nh,
-            "nw": nw,
-            "top": top,
-            "left": left,
-            "_src_h": height,
-            "_src_w": width,
-        }
-
-    def _ensure_valid_params(self, arr, params):
-        if params.get("_validated"):
-            return params
-
-        height = int(params.get("_src_h") or arr.shape[0])
-        width = int(params.get("_src_w") or arr.shape[1])
-
-        # Remove stale validation flag when re-entering after resampling
-        params.pop("_validated", None)
-
-        for attempt in range(3):
-            nh = int(params.get("nh") or 0)
-            nw = int(params.get("nw") or 0)
-            if nh < 1 or nw < 1:
-                if attempt == 2:
-                    raise ValueError(
-                        "RandomScaleCrop failed to sample valid resize dimensions"
-                    )
-                params.update(self._sample_params(height, width))
-                continue
-
-            top = int(params.get("top") or 0)
-            left = int(params.get("left") or 0)
-            max_top = max(nh - self.target_height, 0)
-            max_left = max(nw - self.target_width, 0)
-            if max_top == 0:
-                top = 0
-            else:
-                top = int(np.clip(top, 0, max_top))
-            if max_left == 0:
-                left = 0
-            else:
-                left = int(np.clip(left, 0, max_left))
-
-            bottom = min(top + self.target_height, nh)
-            right = min(left + self.target_width, nw)
-            if bottom <= top or right <= left:
-                if attempt == 2:
-                    raise ValueError(
-                        "RandomScaleCrop produced an empty crop after resampling "
-                        f"parameters: top={top}, left={left}, nh={nh}, nw={nw}"
-                    )
-                params.update(self._sample_params(height, width))
-                continue
-
-            params.update({"nh": nh, "nw": nw, "top": top, "left": left})
-            params["_validated"] = True
-            return params
-
-        raise ValueError("RandomScaleCrop could not determine valid parameters")
-
-    def _apply(self, arr, params, interpolation):
-        params = self._ensure_valid_params(arr, params)
-
-        nh = max(1, int(params["nh"]))
-        nw = max(1, int(params["nw"]))
-        top = int(params["top"])
-        left = int(params["left"])
-
-        resized = cv2.resize(arr, (nw, nh), interpolation=interpolation)
-        bottom = min(top + self.target_height, nh)
-        right = min(left + self.target_width, nw)
-        cropped = resized[top:bottom, left:right]
-
-        if cropped.shape[0] != self.target_height or cropped.shape[1] != self.target_width:
-            cropped = cv2.resize(
-                cropped,
-                (max(1, self.target_width), max(1, self.target_height)),
-                interpolation=interpolation,
-            )
-        return cropped
-
-    def get_params_dependent_on_data(self, params, data=None):
-        data = data or params
-        image = data["image"]
-        height, width = image.shape[:2]
-        return self._sample_params(height, width)
-
-    @property
-    def targets_as_params(self):
-        return ["image"]
-
-    def get_transform_init_args_names(self):
-        return ("scale_min", "scale_max", "target_height", "target_width")
+    def get_params(self) -> dict:
+        low, high = self.alpha_range
+        alpha = float(np.random.uniform(low, high))
+        return {"alpha": alpha}
 
 
 def _build_albu_pipeline(
@@ -150,10 +59,24 @@ def _build_albu_pipeline(
 
     transforms = []
 
-    scale_min = cfg.random_scale_min
-    scale_max = cfg.random_scale_max
-    if cfg.random_crop or scale_min != 1.0 or scale_max != 1.0:
-        transforms.append(RandomScaleCrop(scale_min, scale_max, height, width))
+    scale_min = min(max(cfg.random_scale_min, 0.0), 1.0)
+    scale_max = min(max(cfg.random_scale_max, scale_min), 1.0)
+
+    if cfg.random_crop or scale_min < 1.0 or scale_max < 1.0:
+        # Match the crop aspect ratio to the requested output size so that the
+        # subsequent resize step does not stretch the image horizontally or
+        # vertically.
+        aspect_ratio = float(height) / float(width)
+        transforms.append(
+            A.RandomResizedCrop(
+                size=(height, width),
+                scale=(scale_min, scale_max),
+                ratio=(aspect_ratio, aspect_ratio),
+                interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,
+                p=1.0,
+            )
+        )
 
     if cfg.hflip:
         transforms.append(A.HorizontalFlip(p=0.5))
@@ -165,11 +88,12 @@ def _build_albu_pipeline(
             A.Rotate(
                 limit=(-cfg.random_rotate_deg, cfg.random_rotate_deg),
                 border_mode=cv2.BORDER_CONSTANT,
-                value=0.0,
+                fill=0.0,
                 # Fill exposed mask regions with the dataset ignore label so that
                 # they can be masked out during loss computation.
-                mask_value=ignore_index,
+                fill_mask=ignore_index,
                 interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,
             )
         )
 
@@ -191,6 +115,9 @@ def _build_albu_pipeline(
 
     if cfg.gaussian_noise_std > 0:
         transforms.append(A.GaussNoise(std_range=(0, cfg.gaussian_noise_std), p=1.0))
+
+    if cfg.sepia_probability > 0:
+        transforms.append(SoftSepia(alpha_range=(0.25, 0.45), p=cfg.sepia_probability))
 
     if not transforms:
         transforms.append(A.NoOp(always_apply=True))
