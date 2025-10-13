@@ -10,10 +10,18 @@ def init_mlflow(exp_name: str, base_dir: str = "artifacts/mlruns"):
     mlflow.set_tracking_uri("file://" + os.path.abspath(base_dir))
     mlflow.set_experiment(exp_name)
 
-def start_run(run_name: Optional[str] = None):
+def start_run(run_name: Optional[str] = None, *, nested: bool = False):
+    """Start an MLflow run, making sure no stale run is left open."""
+
+    if not nested:
+        active_run = mlflow.active_run()
+        if active_run is not None:
+            mlflow.end_run()
+
     if run_name is None:
         run_name = f"run-{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    return mlflow.start_run(run_name=run_name)
+
+    return mlflow.start_run(run_name=run_name, nested=nested)
 
 class KerasMlflowLogger(keras.callbacks.Callback):
     def __init__(self, params: Dict,
