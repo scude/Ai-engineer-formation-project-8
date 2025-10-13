@@ -56,15 +56,15 @@ class AugmentConfig:
     hflip: bool = True
     vflip: bool = False
     random_rotate_deg: float = 10.0    # rotation amplitude in degrees (symmetric)
-    random_scale_min: float = 0.5     # multiplicative lower bound for scaling
-    random_scale_max: float = 1.5     # multiplicative upper bound for scaling
+    random_scale_min: float = 0.75     # multiplicative lower bound for scaling
+    random_scale_max: float = 1.25     # multiplicative upper bound for scaling
     random_crop: bool = True
     # photometric (image-only)
-    brightness_delta: float = 1     # ColorJitter brightness factor delta
-    contrast_delta: float = 1       # ColorJitter contrast factor delta
-    saturation_delta: float = 1      # ColorJitter saturation factor delta
-    hue_delta: float = 1            # ColorJitter hue factor delta (0..0.5)
-    gaussian_noise_std: float = 0.5 # standard deviation of additive Gaussian noise in [0,1]
+    brightness_delta: float = 0.3     # ColorJitter brightness factor delta
+    contrast_delta: float = 0.2        # ColorJitter contrast factor delta
+    saturation_delta: float = 0.4      # ColorJitter saturation factor delta
+    hue_delta: float = 0.2             # ColorJitter hue factor delta (0..0.5)
+    gaussian_noise_std: float = 0.15  # standard deviation of additive Gaussian noise in [0,1]
     # enable/disable all aug
     enabled: bool = True
 

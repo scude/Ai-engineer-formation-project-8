@@ -182,7 +182,7 @@ def _build_albu_pipeline(
     if any(delta > 0 for delta in color_params):
         transforms.append(
             A.ColorJitter(
-                brightness=cfg.brightness_delta,
+                brightness= cfg.brightness_delta,
                 contrast=cfg.contrast_delta,
                 saturation=cfg.saturation_delta,
                 hue=cfg.hue_delta,
@@ -190,8 +190,7 @@ def _build_albu_pipeline(
         )
 
     if cfg.gaussian_noise_std > 0:
-        std255 = cfg.gaussian_noise_std * 255.0
-        transforms.append(A.GaussNoise(var_limit=(0.0, float(std255**2)), mean=0.0))
+        transforms.append(A.GaussNoise(std_range=(0, cfg.gaussian_noise_std), p=1.0))
 
     if not transforms:
         transforms.append(A.NoOp(always_apply=True))
