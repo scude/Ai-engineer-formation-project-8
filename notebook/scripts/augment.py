@@ -23,13 +23,24 @@ class SoftSepia(A.ImageOnlyTransform):
     """
 
     def __init__(self, alpha_range: Tuple[float, float], always_apply: bool = False, p: float = 0.5):
-        super().__init__(always_apply, p)
+        super().__init__(p=p)
+        self.always_apply = bool(always_apply)
         low, high = alpha_range
         low, high = sorted((float(low), float(high)))
         self.alpha_range = (
             max(0.0, low),
             min(1.0, high),
         )
+        # ``BasicTransform`` (the Albumentations base class) is responsible for
+        # tracking the probability ``p`` that controls whether the transform is
+        # applied.  In practice we observed that the value passed to ``p`` could
+        # be lost when ``ImageOnlyTransform`` is initialised with positional
+        # arguments, which results in a zero probability and therefore the
+        # transform never running.  Reassigning it explicitly ensures that the
+        # caller-provided probability is respected regardless of Albumentations'
+        # internal initialisation quirks.
+        self.p = float(np.clip(p, 0.0, 1.0))
+
         self._kernel = np.array(
             [
                 [0.393, 0.769, 0.189],
