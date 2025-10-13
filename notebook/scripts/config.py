@@ -24,6 +24,9 @@ class TrainConfig:
     lr: float = 3e-4
     epochs: int = 60
     optimizer: str = "adam"
+    momentum: Optional[float] = None
+    weight_decay: Optional[float] = None
+    poly_power: Optional[float] = None
     early_stop_patience: int = 10
     output_dir: str = "artifacts"
     exp_name: str = "cityscapes-seg-8cls"

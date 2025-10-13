@@ -8,7 +8,7 @@ os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
 import re, shutil, argparse, csv, datetime
 from dataclasses import replace
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 import tensorflow as tf
 from tensorflow import keras
 from .config import (
@@ -57,19 +57,47 @@ def _best_ckpt(path: str, monitor: str):
                 best, score = os.path.join(path, f), s
     return best, score
 
-def build_optimizer(name: str, lr: float):
+def build_optimizer(name: str, lr, momentum: float | None = None, weight_decay: float | None = None):
     name = name.lower()
-    if name == "adam": return keras.optimizers.Adam(lr)
-    if name == "adamw": return keras.optimizers.AdamW(lr)
-    if name == "sgd": return keras.optimizers.SGD(lr, momentum=0.9, nesterov=True)
+    if name == "adam":
+        return keras.optimizers.Adam(learning_rate=lr)
+    if name == "adamw":
+        kwargs = {}
+        if weight_decay is not None:
+            kwargs["weight_decay"] = weight_decay
+        return keras.optimizers.AdamW(learning_rate=lr, **kwargs)
+    if name == "sgd":
+        kwargs = {"momentum": 0.9, "nesterov": True}
+        if momentum is not None:
+            kwargs["momentum"] = momentum
+        if weight_decay is not None:
+            kwargs["weight_decay"] = weight_decay
+        try:
+            return keras.optimizers.SGD(learning_rate=lr, **kwargs)
+        except TypeError:
+            kwargs.pop("weight_decay", None)
+            opt = keras.optimizers.SGD(learning_rate=lr, **kwargs)
+            if weight_decay is not None:
+                setattr(opt, "weight_decay", weight_decay)
+            return opt
     raise ValueError(f"Unknown optimizer: {name}")
 
 def train(model_name: str = "unet_small",
           data_cfg: DataConfig = DataConfig(),
           train_cfg: TrainConfig = TrainConfig(),
-          aug_cfg: Optional[AugmentConfig] = None):
+          aug_cfg: Optional[AugmentConfig] = None,
+          model_kwargs: Optional[dict[str, Any]] = None):
+    for gpu in tf.config.list_physical_devices("GPU"):
+        try:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        except (RuntimeError, ValueError):
+            # Memory growth must be set before GPUs are initialized. If this
+            # fails we simply continue with the default allocation strategy.
+            pass
     if aug_cfg is None:
         aug_cfg = replace(DEFAULT_AUGMENT_CONFIG)
+    if model_kwargs is None:
+        model_kwargs = {}
     model_name = _canonical_arch(model_name)
     train_cfg.arch = model_name
     # reproducibility
@@ -130,7 +158,7 @@ def train(model_name: str = "unet_small",
 
     # model
     input_shape = (data_cfg.height, data_cfg.width, 3)
-    model = build_model(model_name, data_cfg.num_classes, input_shape)
+    model = build_model(model_name, data_cfg.num_classes, input_shape, **model_kwargs)
 
     # compile
     base_loss = keras.losses.SparseCategoricalCrossentropy(
@@ -215,7 +243,27 @@ def train(model_name: str = "unet_small",
             name="dice_coef",
         ),
     ]
-    opt = build_optimizer(train_cfg.optimizer, train_cfg.lr)
+    effective_lr = train_cfg.lr
+    if train_cfg.poly_power is not None:
+        steps_per_epoch = tf.data.experimental.cardinality(train_ds)
+        if steps_per_epoch == tf.data.experimental.INFINITE_CARDINALITY:
+            total_steps = train_cfg.epochs
+        else:
+            steps_per_epoch = int(steps_per_epoch.numpy()) if hasattr(steps_per_epoch, "numpy") else int(steps_per_epoch)
+            total_steps = max(1, steps_per_epoch * max(train_cfg.epochs, 1))
+        effective_lr = keras.optimizers.schedules.PolynomialDecay(
+            initial_learning_rate=train_cfg.lr,
+            decay_steps=total_steps,
+            end_learning_rate=train_cfg.lr * 1e-2,
+            power=train_cfg.poly_power,
+        )
+
+    opt = build_optimizer(
+        train_cfg.optimizer,
+        effective_lr,
+        momentum=train_cfg.momentum,
+        weight_decay=train_cfg.weight_decay,
+    )
     if compute_dtype == tf.float16:
 
         # ``LossScaleOptimizer`` keeps gradients in float32 to avoid underflow when
@@ -350,6 +398,8 @@ def train(model_name: str = "unet_small",
 
     mlflow.end_run()
     print("MLflow run ended.")
+
+    return restored_metrics
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()

@@ -90,6 +90,8 @@ def aspp_block(
     x: keras.layers.Layer,
     out_channels: int = 256,
     rates: Tuple[int, int, int] = (6, 12, 18),
+    activation: str = "relu",
+    dropout: float = 0.1,
     name: str = "aspp",
 ) -> keras.layers.Layer:
     """Atrous Spatial Pyramid Pooling head used by DeepLab-like models."""
@@ -97,7 +99,7 @@ def aspp_block(
     img_pool = layers.GlobalAveragePooling2D(keepdims=True, name=f"{name}_gp")(x)
     img_pool = layers.Conv2D(out_channels, 1, use_bias=False, name=f"{name}_gp_conv")(img_pool)
     img_pool = layers.BatchNormalization(name=f"{name}_gp_bn")(img_pool)
-    img_pool = layers.ReLU(name=f"{name}_gp_relu")(img_pool)
+    img_pool = layers.Activation(activation, name=f"{name}_gp_act")(img_pool)
     img_pool = layers.Resizing(h, w, interpolation="bilinear", name=f"{name}_gp_resize")(img_pool)
 
     branches = [
@@ -113,14 +115,14 @@ def aspp_block(
             name=f"{name}_atrous{i}",
         )(x)
         b = layers.BatchNormalization(name=f"{name}_atrous{i}_bn")(b)
-        b = layers.ReLU(name=f"{name}_atrous{i}_relu")(b)
+        b = layers.Activation(activation, name=f"{name}_atrous{i}_act")(b)
         branches.append(b)
 
     x = layers.Concatenate(name=f"{name}_concat")([*branches, img_pool])
     x = layers.Conv2D(out_channels, 1, use_bias=False, name=f"{name}_proj_conv")(x)
     x = layers.BatchNormalization(name=f"{name}_proj_bn")(x)
-    x = layers.ReLU(name=f"{name}_proj_relu")(x)
-    return layers.Dropout(0.1, name=f"{name}_dropout")(x)
+    x = layers.Activation(activation, name=f"{name}_proj_act")(x)
+    return layers.Dropout(dropout, name=f"{name}_dropout")(x)
 
 
 def deeplab_resnet50(
@@ -128,6 +130,11 @@ def deeplab_resnet50(
     num_classes: int,
     output_stride: int = 16,
     imagenet: bool = True,
+    aspp_dilations: Tuple[int, int, int] = (6, 12, 18),
+    decoder_filters: int = 256,
+    aspp_dropout: float = 0.1,
+    decoder_activation: str = "relu",
+    aspp_activation: str = "relu",
     **_: Any,
 ) -> keras.Model:
     assert output_stride in (8, 16)
@@ -137,21 +144,32 @@ def deeplab_resnet50(
         input_shape=input_shape,
     )
     low = base.get_layer("conv2_block3_out").output
-    high = base.get_layer("conv4_block6_out").output
+    if len(aspp_dilations) != 3:
+        raise ValueError("'aspp_dilations' must contain exactly three dilation rates")
+    if output_stride == 16:
+        high = base.get_layer("conv4_block6_out").output
+    else:
+        high = base.get_layer("conv3_block4_out").output
 
-    x = aspp_block(high, 256, (6, 12, 18))
+    x = aspp_block(
+        high,
+        256,
+        aspp_dilations,
+        activation=aspp_activation,
+        dropout=aspp_dropout,
+    )
     low_h, low_w = keras.backend.int_shape(low)[1:3]
     x = layers.Resizing(low_h, low_w, interpolation="bilinear")(x)
 
     lowp = layers.Conv2D(48, 1, use_bias=False)(low)
     lowp = layers.BatchNormalization()(lowp)
-    lowp = layers.ReLU()(lowp)
+    lowp = layers.Activation(decoder_activation)(lowp)
 
     x = layers.Concatenate()([x, lowp])
     for _ in range(2):
-        x = layers.SeparableConv2D(256, 3, padding="same", use_bias=False)(x)
+        x = layers.SeparableConv2D(decoder_filters, 3, padding="same", use_bias=False)(x)
         x = layers.BatchNormalization()(x)
-        x = layers.ReLU()(x)
+        x = layers.Activation(decoder_activation)(x)
 
     logits = layers.Conv2D(num_classes, 1, name="logits")(x)
     logits = layers.Resizing(input_shape[0], input_shape[1], interpolation="bilinear")(logits)
