@@ -4,7 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
-from notebook.scripts.config import AugmentConfig, DEFAULT_PALETTE_8
+from dataclasses import replace
+
+from notebook.scripts.config import (
+    AugmentConfig,
+    DEFAULT_AUGMENT_CONFIG,
+    DEFAULT_PALETTE_8,
+)
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent
 MODEL_PATH: Final[Path] = (
@@ -24,20 +30,7 @@ CLASS_NAMES: Final[list[str]] = [
 
 PALETTE: Final[dict[int, tuple[int, int, int]]] = DEFAULT_PALETTE_8
 
-AUGMENT_CONFIG: Final[AugmentConfig] = AugmentConfig(
-    enabled=True,
-    hflip=True,
-    vflip=False,
-    random_rotate_deg=10.0,
-    random_scale_min=0.75,
-    random_scale_max=1.25,
-    random_crop=True,
-    brightness_delta=0.2,
-    contrast_delta=0.2,
-    saturation_delta=0.2,
-    hue_delta=0.05,
-    gaussian_noise_std=0.01,
-)
+AUGMENT_CONFIG: Final[AugmentConfig] = replace(DEFAULT_AUGMENT_CONFIG)
 
 APP_STATIC_FOLDER: Final[str] = str(BASE_DIR / "static")
 APP_TEMPLATE_FOLDER: Final[str] = str(BASE_DIR / "templates")

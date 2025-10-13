@@ -7,10 +7,16 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
 import re, shutil, argparse, csv, datetime
-from typing import Callable
+from dataclasses import replace
+from typing import Callable, Optional
 import tensorflow as tf
 from tensorflow import keras
-from .config import DataConfig, TrainConfig, AugmentConfig
+from .config import (
+    DataConfig,
+    TrainConfig,
+    AugmentConfig,
+    DEFAULT_AUGMENT_CONFIG,
+)
 from .data import build_dataset, prepare_labels_for_loss
 from .models import AVAILABLE_MODELS, build_model
 from .metrics import masked_mean_iou, masked_pixel_accuracy, dice_coef_wrapper
@@ -61,7 +67,9 @@ def build_optimizer(name: str, lr: float):
 def train(model_name: str = "unet_small",
           data_cfg: DataConfig = DataConfig(),
           train_cfg: TrainConfig = TrainConfig(),
-          aug_cfg: AugmentConfig = AugmentConfig()):
+          aug_cfg: Optional[AugmentConfig] = None):
+    if aug_cfg is None:
+        aug_cfg = replace(DEFAULT_AUGMENT_CONFIG)
     model_name = _canonical_arch(model_name)
     train_cfg.arch = model_name
     # reproducibility
@@ -375,18 +383,19 @@ if __name__ == "__main__":
     )
 
     # Aug params
-    p.add_argument("--aug_enabled", type=int, default=1)
-    p.add_argument("--hflip", type=int, default=1)
-    p.add_argument("--vflip", type=int, default=0)
-    p.add_argument("--rotate", type=float, default=0.0)
-    p.add_argument("--scale_min", type=float, default=1.0)
-    p.add_argument("--scale_max", type=float, default=1.0)
-    p.add_argument("--random_crop", type=int, default=0)
-    p.add_argument("--brightness", type=float, default=0.0)
-    p.add_argument("--contrast", type=float, default=0.0)
-    p.add_argument("--saturation", type=float, default=0.0)
-    p.add_argument("--hue", type=float, default=0.0)
-    p.add_argument("--noise_std", type=float, default=0.0)
+    default_aug = DEFAULT_AUGMENT_CONFIG
+    p.add_argument("--aug_enabled", type=int, default=int(default_aug.enabled))
+    p.add_argument("--hflip", type=int, default=int(default_aug.hflip))
+    p.add_argument("--vflip", type=int, default=int(default_aug.vflip))
+    p.add_argument("--rotate", type=float, default=default_aug.random_rotate_deg)
+    p.add_argument("--scale_min", type=float, default=default_aug.random_scale_min)
+    p.add_argument("--scale_max", type=float, default=default_aug.random_scale_max)
+    p.add_argument("--random_crop", type=int, default=int(default_aug.random_crop))
+    p.add_argument("--brightness", type=float, default=default_aug.brightness_delta)
+    p.add_argument("--contrast", type=float, default=default_aug.contrast_delta)
+    p.add_argument("--saturation", type=float, default=default_aug.saturation_delta)
+    p.add_argument("--hue", type=float, default=default_aug.hue_delta)
+    p.add_argument("--noise_std", type=float, default=default_aug.gaussian_noise_std)
 
     args = p.parse_args()
 

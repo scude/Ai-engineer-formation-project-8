@@ -1,6 +1,6 @@
 # /scripts/config.py
 from dataclasses import dataclass
-from typing import Optional, Tuple, Dict
+from typing import Optional
 
 @dataclass
 class DataConfig:
@@ -55,18 +55,20 @@ class AugmentConfig:
     # geometric
     hflip: bool = True
     vflip: bool = False
-    random_rotate_deg: float = 0.0     # rotation amplitude in degrees (symmetric)
-    random_scale_min: float = 1.0      # multiplicative lower bound for scaling
-    random_scale_max: float = 1.0      # multiplicative upper bound for scaling
-    random_crop: bool = False          # if True, enable random scale+crop to (H,W)
+    random_rotate_deg: float = 10.0    # rotation amplitude in degrees (symmetric)
+    random_scale_min: float = 0.5     # multiplicative lower bound for scaling
+    random_scale_max: float = 1.5     # multiplicative upper bound for scaling
+    random_crop: bool = True
     # photometric (image-only)
-    brightness_delta: float = 0.0      # ColorJitter brightness factor delta
-    contrast_delta: float = 0.0        # ColorJitter contrast factor delta
-    saturation_delta: float = 0.0      # ColorJitter saturation factor delta
-    hue_delta: float = 0.0             # ColorJitter hue factor delta (0..0.5)
-    gaussian_noise_std: float = 0.0    # standard deviation of additive Gaussian noise in [0,1]
+    brightness_delta: float = 1     # ColorJitter brightness factor delta
+    contrast_delta: float = 1       # ColorJitter contrast factor delta
+    saturation_delta: float = 1      # ColorJitter saturation factor delta
+    hue_delta: float = 1            # ColorJitter hue factor delta (0..0.5)
+    gaussian_noise_std: float = 0.5 # standard deviation of additive Gaussian noise in [0,1]
     # enable/disable all aug
     enabled: bool = True
+
+DEFAULT_AUGMENT_CONFIG = AugmentConfig()
 
 DEFAULT_PALETTE_8 = {
     0:(128, 64,128), 1:(244, 35,232), 2:( 70, 70, 70), 3:(220,220,  0),
