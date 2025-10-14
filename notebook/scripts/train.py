@@ -6,7 +6,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # masque INFO & WARNING C++
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
-import re, shutil, argparse, csv, datetime
+import re, shutil, argparse, csv, datetime, gc
 from dataclasses import replace
 from typing import Any, Callable, Optional
 import tensorflow as tf
@@ -86,7 +86,45 @@ def train(model_name: str = "unet_small",
           data_cfg: DataConfig = DataConfig(),
           train_cfg: TrainConfig = TrainConfig(),
           aug_cfg: Optional[AugmentConfig] = None,
-          model_kwargs: Optional[dict[str, Any]] = None):
+          model_kwargs: Optional[dict[str, Any]] = None,
+          *,
+          use_mlflow: bool = True,
+          keep_artifacts: bool = True,
+          cleanup_after: bool = False,
+          probe_dataset: bool = True):
+    """Train a segmentation model.
+
+    Parameters
+    ----------
+    model_name:
+        Architecture key registered in :data:`AVAILABLE_MODELS`.
+    data_cfg:
+        Dataset configuration describing input sizes, sampling limits, etc.
+    train_cfg:
+        Training hyper-parameters (optimizer, learning rate schedule, output
+        paths, ...).
+    aug_cfg:
+        Optional augmentation configuration. When ``None`` the default
+        augmentation settings are copied to avoid mutating shared state.
+    model_kwargs:
+        Extra keyword arguments forwarded to :func:`build_model`.
+    use_mlflow:
+        When ``False`` the run avoids initialising MLflow, which keeps the
+        Optuna objective lightweight.
+    keep_artifacts:
+        Toggle checkpoint and CSV exports. For Optuna sweeps it is common to
+        disable artifact retention so temporary files do not accumulate.
+    cleanup_after:
+        When ``True`` datasets, compiled models and temporary directories are
+        explicitly released at the end of training. This is designed for the
+        Optuna objective where repeated trials in a single Python process would
+        otherwise retain large objects in memory.
+    probe_dataset:
+        When ``True`` the loader fetches a single batch to report the shapes and
+        data types flowing through the pipeline. Disable it to skip the
+        additional warm-up pass when minimising start-up time (e.g. within
+        Optuna trials).
+    """
     for gpu in tf.config.list_physical_devices("GPU"):
         try:
             tf.config.experimental.set_memory_growth(gpu, True)
@@ -126,7 +164,8 @@ def train(model_name: str = "unet_small",
     print(f"TF {tf.__version__} | GPUs: {tf.config.list_physical_devices('GPU')}")
     os.makedirs(train_cfg.output_dir, exist_ok=True)
     ckpt_root = os.path.join(train_cfg.output_dir, "checkpoints")
-    os.makedirs(ckpt_root, exist_ok=True)
+    if keep_artifacts:
+        os.makedirs(ckpt_root, exist_ok=True)
 
     # data
     train_ds_with_weights = build_dataset(data_cfg, aug_cfg, split="train", training=True)
@@ -137,8 +176,9 @@ def train(model_name: str = "unet_small",
         training=False,
     )
 
-    for xb, yb, wb in train_ds_with_weights.take(1):
-        print(f"probe -> x:{xb.shape} {xb.dtype} | y:{yb.shape} {yb.dtype} | w:{wb.shape} {wb.dtype}")
+    if probe_dataset:
+        for xb, yb, wb in train_ds_with_weights.take(1):
+            print(f"probe -> x:{xb.shape} {xb.dtype} | y:{yb.shape} {yb.dtype} | w:{wb.shape} {wb.dtype}")
 
     def _drop_weights(ds):
         return ds.map(lambda x, y, w: (x, y), num_parallel_calls=tf.data.AUTOTUNE)
@@ -274,130 +314,173 @@ def train(model_name: str = "unet_small",
             opt = mixed_precision.LossScaleOptimizer(opt)
     model.compile(optimizer=opt, loss=loss_fn, metrics=metrics)
 
-    # MLflow
-    init_mlflow(train_cfg.exp_name)
-    run = start_run(run_name=f"{model_name}")
-    run_id = getattr(getattr(run, "info", None), "run_id", None)
-    if not run_id:
-        run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    ckpt_dir = os.path.join(ckpt_root, run_id)
-    os.makedirs(ckpt_dir, exist_ok=True)
-    max_train_samples = getattr(train_cfg, "max_train_samples", None)
-    max_val_samples = getattr(train_cfg, "max_val_samples", None)
-    mlf_logger = KerasMlflowLogger({
-        "arch": model_name,
-        "model": model_name,
-        "height": data_cfg.height,
-        "width": data_cfg.width,
-        "batch_size": data_cfg.batch_size,
-        "lr": train_cfg.lr,
-        "epochs": train_cfg.epochs,
-        "optimizer": train_cfg.optimizer,
-        "aug": vars(aug_cfg),
-        "ignore_index": data_cfg.ignore_index,
-        "loss": loss_choice,
-        "precision_policy": current_policy,
-    }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
+    # MLflow / bookkeeping
+    mlflow_enabled = bool(use_mlflow)
+    run = None
+    run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    if mlflow_enabled:
+        init_mlflow(train_cfg.exp_name)
+        run = start_run(run_name=f"{model_name}")
+        mlflow_run_id = getattr(getattr(run, "info", None), "run_id", None)
+        if mlflow_run_id:
+            run_id = mlflow_run_id
+
+    ckpt_dir = os.path.join(ckpt_root, run_id) if keep_artifacts else None
+    if keep_artifacts and ckpt_dir:
+        os.makedirs(ckpt_dir, exist_ok=True)
+
+    mlf_logger = None
+    if mlflow_enabled:
+        max_train_samples = getattr(train_cfg, "max_train_samples", None)
+        max_val_samples = getattr(train_cfg, "max_val_samples", None)
+        mlf_logger = KerasMlflowLogger({
+            "arch": model_name,
+            "model": model_name,
+            "height": data_cfg.height,
+            "width": data_cfg.width,
+            "batch_size": data_cfg.batch_size,
+            "lr": train_cfg.lr,
+            "epochs": train_cfg.epochs,
+            "optimizer": train_cfg.optimizer,
+            "aug": vars(aug_cfg),
+            "ignore_index": data_cfg.ignore_index,
+            "loss": loss_choice,
+            "precision_policy": current_policy,
+        }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
 
     monitor_metric = "val_masked_mIoU"
     if loss_choice in {"dice", "ce+dice"}:
         monitor_metric = "val_dice_coef"
 
-    callbacks = [
-        keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(
-                ckpt_dir,
-                f"{model_name}.{monitor_metric}.{{epoch:03d}}-{{{monitor_metric}:.4f}}.keras",
-            ),
-            monitor=monitor_metric,
-            mode="max",
-            save_best_only=True,
-        ),
+    callbacks: list[keras.callbacks.Callback] = []
+    if keep_artifacts and ckpt_dir is not None:
+        callbacks.append(
+            keras.callbacks.ModelCheckpoint(
+                filepath=os.path.join(
+                    ckpt_dir,
+                    f"{model_name}.{monitor_metric}.{{epoch:03d}}-{{{monitor_metric}:.4f}}.keras",
+                ),
+                monitor=monitor_metric,
+                mode="max",
+                save_best_only=True,
+            )
+        )
+    callbacks.append(
         keras.callbacks.EarlyStopping(
             monitor=monitor_metric,
             mode="max",
             patience=train_cfg.early_stop_patience,
             restore_best_weights=True,
-        ),
-        keras.callbacks.TerminateOnNaN(),
-        keras.callbacks.CSVLogger(os.path.join(train_cfg.output_dir, "train_log.csv")),
-        mlf_logger,
-    ]
+        )
+    )
+    callbacks.append(keras.callbacks.TerminateOnNaN())
+    csv_path = None
+    if keep_artifacts:
+        csv_path = os.path.join(train_cfg.output_dir, "train_log.csv")
+        callbacks.append(keras.callbacks.CSVLogger(csv_path))
+    if mlflow_enabled and mlf_logger is not None:
+        callbacks.append(mlf_logger)
 
-    hist = model.fit(train_ds, validation_data=val_ds, epochs=train_cfg.epochs, callbacks=callbacks, verbose=1)
-
-    # evaluate restored weights (EarlyStopping may have reloaded best checkpoint)
-    restored_metrics = model.evaluate(val_ds, return_dict=True)
-    print("Restored weights evaluation:")
-    for name, value in restored_metrics.items():
-        print(f"  {name}: {value:.6f}")
-        mlflow.log_metric(f"restored_{name}", float(value))
-
-    hist_len = len(hist.history.get("loss", []))
-    if hist_len:
-        for name, value in restored_metrics.items():
-            float_value = float(value)
-            mlflow.log_metric(f"val_{name}", float_value, step=hist_len)
-
-            val_key = f"val_{name}"
-            if val_key in hist.history and hist.history[val_key]:
-                hist.history[val_key][-1] = float_value
-            elif val_key in hist.history:
-                hist.history[val_key] = [float_value]
-            else:
-                hist.history[val_key] = [float("nan")] * (hist_len - 1) + [float_value]
-
-    csv_path = os.path.join(train_cfg.output_dir, "train_log.csv")
-    if hist_len and os.path.exists(csv_path):
-        try:
-            with open(csv_path, newline="") as f:
-                rows = list(csv.DictReader(f))
-            if rows:
-                fieldnames = rows[0].keys()
-                updated = False
-                for name, value in restored_metrics.items():
-                    val_key = f"val_{name}"
-                    if val_key in rows[-1]:
-                        rows[-1][val_key] = str(float(value))
-                        updated = True
-                if updated:
-                    with open(csv_path, "w", newline="") as f:
-                        writer = csv.DictWriter(f, fieldnames=fieldnames)
-                        writer.writeheader()
-                        writer.writerows(rows)
-        except Exception as e:
-            print(f"Failed to update CSV log with restored metrics: {e}")
-
-    # save final
-    final_path = os.path.join(train_cfg.output_dir, f"{model_name}_final.keras")
-    model.save(final_path)
-    print(f"saved -> {final_path}")
-
-    # best ckpt copy
-    best_path, best_score = _best_ckpt(ckpt_dir, monitor_metric)
+    # --- training loop & bookkeeping -----------------------------------------------------
+    final_path = os.path.join(train_cfg.output_dir, f"{model_name}_final.keras") if keep_artifacts else None
     best_export = None
-    if best_path:
-        best_export = os.path.join(train_cfg.output_dir, f"{model_name}_best.keras")
-        shutil.copy2(best_path, best_export)
-        print(f"best -> {os.path.basename(best_path)} ({monitor_metric}={best_score:.4f}) | exported: {best_export}")
+    hist = None
+    restored_metrics: dict[str, float] = {}
 
-    # log artifacts
-    mlflow.log_artifact(os.path.join(train_cfg.output_dir, "train_log.csv"), artifact_path="logs")
-    if os.path.exists(final_path): mlflow.log_artifact(final_path, artifact_path="models")
-    if best_export and os.path.exists(best_export):
-        mlflow.log_artifact(best_export, artifact_path="models")
-        try:
-            bm = keras.models.load_model(best_export, compile=False)
-            mlflow.keras.log_model(bm, artifact_path="best_model")
-            mlflow.log_metric(f"best_{monitor_metric}", float(best_score))
-        except Exception as e:
-            print("mlflow keras flavor failed:", e)
+    try:
+        hist = model.fit(
+            train_ds,
+            validation_data=val_ds,
+            epochs=train_cfg.epochs,
+            callbacks=callbacks,
+            verbose=1,
+        )
 
-    if os.path.isdir(ckpt_dir):
-        shutil.rmtree(ckpt_dir, ignore_errors=True)
+        # evaluate restored weights (EarlyStopping may have reloaded best checkpoint)
+        restored_metrics = model.evaluate(val_ds, return_dict=True)
+        print("Restored weights evaluation:")
+        for name, value in restored_metrics.items():
+            print(f"  {name}: {value:.6f}")
+            if mlflow_enabled:
+                mlflow.log_metric(f"restored_{name}", float(value))
 
-    mlflow.end_run()
-    print("MLflow run ended.")
+        hist_len = len(hist.history.get("loss", [])) if hist is not None else 0
+        if hist is not None and hist_len:
+            for name, value in restored_metrics.items():
+                float_value = float(value)
+                if mlflow_enabled:
+                    mlflow.log_metric(f"val_{name}", float_value, step=hist_len)
+
+                val_key = f"val_{name}"
+                if val_key in hist.history and hist.history[val_key]:
+                    hist.history[val_key][-1] = float_value
+                elif val_key in hist.history:
+                    hist.history[val_key] = [float_value]
+                else:
+                    hist.history[val_key] = [float("nan")] * (hist_len - 1) + [float_value]
+
+        if keep_artifacts and csv_path and hist is not None and hist_len and os.path.exists(csv_path):
+            try:
+                with open(csv_path, newline="") as f:
+                    rows = list(csv.DictReader(f))
+                if rows:
+                    fieldnames = rows[0].keys()
+                    updated = False
+                    for name, value in restored_metrics.items():
+                        val_key = f"val_{name}"
+                        if val_key in rows[-1]:
+                            rows[-1][val_key] = str(float(value))
+                            updated = True
+                    if updated:
+                        with open(csv_path, "w", newline="") as f:
+                            writer = csv.DictWriter(f, fieldnames=fieldnames)
+                            writer.writeheader()
+                            writer.writerows(rows)
+            except Exception as e:
+                print(f"Failed to update CSV log with restored metrics: {e}")
+
+        if keep_artifacts and final_path:
+            model.save(final_path)
+            print(f"saved -> {final_path}")
+
+            best_path, best_score = _best_ckpt(ckpt_dir, monitor_metric) if ckpt_dir else (None, -1.0)
+            if best_path:
+                best_export = os.path.join(train_cfg.output_dir, f"{model_name}_best.keras")
+                shutil.copy2(best_path, best_export)
+                print(
+                    f"best -> {os.path.basename(best_path)} ({monitor_metric}={best_score:.4f}) | exported: {best_export}"
+                )
+
+            # log artifacts
+            if csv_path and os.path.exists(csv_path) and mlflow_enabled:
+                mlflow.log_artifact(os.path.join(train_cfg.output_dir, "train_log.csv"), artifact_path="logs")
+            if mlflow_enabled:
+                if os.path.exists(final_path):
+                    mlflow.log_artifact(final_path, artifact_path="models")
+                if best_export and os.path.exists(best_export):
+                    mlflow.log_artifact(best_export, artifact_path="models")
+                    try:
+                        bm = keras.models.load_model(best_export, compile=False)
+                        mlflow.keras.log_model(bm, artifact_path="best_model")
+                        mlflow.log_metric(f"best_{monitor_metric}", float(best_score))
+                    except Exception as e:
+                        print("mlflow keras flavor failed:", e)
+
+            if ckpt_dir and os.path.isdir(ckpt_dir):
+                shutil.rmtree(ckpt_dir, ignore_errors=True)
+
+    finally:
+        if cleanup_after:
+            # Explicitly release dataset and model references to curb memory usage in Optuna trials
+            del train_ds_with_weights, val_ds_with_weights, train_ds, val_ds, model
+            keras.backend.clear_session()
+            gc.collect()
+            if not keep_artifacts:
+                shutil.rmtree(train_cfg.output_dir, ignore_errors=True)
+
+    if mlflow_enabled:
+        mlflow.end_run()
+        print("MLflow run ended.")
 
     return restored_metrics
 

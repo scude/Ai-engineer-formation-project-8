@@ -18,6 +18,7 @@ class DataConfig:
     autotune: Optional[int] = None  # tf.data.AUTOTUNE set in code
     max_train_samples: Optional[int] = None
     max_val_samples: Optional[int] = None
+    verbose: bool = True
 
 @dataclass
 class TrainConfig:

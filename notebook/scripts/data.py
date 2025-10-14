@@ -50,8 +50,10 @@ def sanitize_labels_for_loss(y, ignore_index):
 
 def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: bool):
     xs, ys, miss = gather_pairs(cfg, split)
-    print(f"[info] {split}: {len(xs)} pairs | missing: {len(miss)}")
-    if xs: print("ex:", xs[0], "->", ys[0])
+    if getattr(cfg, "verbose", True):
+        print(f"[info] {split}: {len(xs)} pairs | missing: {len(miss)}")
+        if xs:
+            print("ex:", xs[0], "->", ys[0])
 
     aug_fn = build_augment_fn(aug, cfg.height, cfg.width, cfg.ignore_index)
     AUTOTUNE = tf.data.AUTOTUNE if cfg.autotune is None else cfg.autotune
