@@ -294,7 +294,7 @@ def train(model_name: str = "unet_small",
         effective_lr = keras.optimizers.schedules.PolynomialDecay(
             initial_learning_rate=train_cfg.lr,
             decay_steps=total_steps,
-            end_learning_rate=train_cfg.lr * 1e-2,
+            end_learning_rate=0.0,
             power=train_cfg.poly_power,
         )
 
@@ -333,7 +333,9 @@ def train(model_name: str = "unet_small",
     if mlflow_enabled:
         max_train_samples = getattr(train_cfg, "max_train_samples", None)
         max_val_samples = getattr(train_cfg, "max_val_samples", None)
-        mlf_logger = KerasMlflowLogger({
+        schedule = "polynomial_decay" if train_cfg.poly_power is not None else "constant"
+        model_params = {f"model__{k}": v for k, v in model_kwargs.items()}
+        params = {
             "arch": model_name,
             "model": model_name,
             "height": data_cfg.height,
@@ -342,11 +344,21 @@ def train(model_name: str = "unet_small",
             "lr": train_cfg.lr,
             "epochs": train_cfg.epochs,
             "optimizer": train_cfg.optimizer,
+            "momentum": train_cfg.momentum,
+            "weight_decay": train_cfg.weight_decay,
+            "lr_scheduler": schedule,
+            "poly_power": train_cfg.poly_power,
             "aug": vars(aug_cfg),
             "ignore_index": data_cfg.ignore_index,
             "loss": loss_choice,
             "precision_policy": current_policy,
-        }, max_train_samples=max_train_samples, max_val_samples=max_val_samples)
+        }
+        params.update(model_params)
+        mlf_logger = KerasMlflowLogger(
+            params,
+            max_train_samples=max_train_samples,
+            max_val_samples=max_val_samples,
+        )
 
     monitor_metric = "val_masked_mIoU"
     if loss_choice in {"dice", "ce+dice"}:
@@ -494,9 +506,13 @@ if __name__ == "__main__":
     p.add_argument("--batch_size", type=int, default=2)
     p.add_argument("--max_train_samples", type=int, default=None)
     p.add_argument("--max_val_samples", type=int, default=None)
-    p.add_argument("--epochs", type=int, default=60)
-    p.add_argument("--lr", type=float, default=3e-4)
-    p.add_argument("--optimizer", default="adam", choices=["adam","adamw","sgd"])
+    p.add_argument("--epochs", type=int, default=200)
+    p.add_argument("--lr", type=float, default=1e-2)
+    p.add_argument("--optimizer", default="sgd", choices=["adam","adamw","sgd"])
+    p.add_argument("--momentum", type=float, default=0.9)
+    p.add_argument("--weight_decay", type=float, default=5e-4)
+    p.add_argument("--poly_power", type=float, default=0.9,
+                   help="Polynomial decay power. Set to a negative value to disable the scheduler.")
     p.add_argument("--loss", default="ce", choices=["ce", "dice", "ce+dice"])
     p.add_argument(
         "--deterministic_ops",
@@ -530,6 +546,8 @@ if __name__ == "__main__":
     p.add_argument("--hue", type=float, default=default_aug.hue_delta)
     p.add_argument("--noise_std", type=float, default=default_aug.gaussian_noise_std)
     p.add_argument("--sepia_p", type=float, default=default_aug.sepia_probability)
+    p.add_argument("--aspp_dropout", type=float, default=0.5,
+                   help="Dropout rate applied in the DeepLab ASPP head")
 
     args = p.parse_args()
 
@@ -547,10 +565,14 @@ if __name__ == "__main__":
         max_train_samples=args.max_train_samples,
         max_val_samples=args.max_val_samples
     )
+    poly_power = None if args.poly_power is not None and args.poly_power < 0 else args.poly_power
     train_cfg = TrainConfig(
         lr=args.lr,
         epochs=args.epochs,
         optimizer=args.optimizer,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+        poly_power=poly_power,
         arch=arch,
         loss=loss_choice,
         deterministic_ops=bool(args.deterministic_ops),
@@ -563,4 +585,8 @@ if __name__ == "__main__":
         saturation_delta=args.saturation, hue_delta=args.hue, gaussian_noise_std=args.noise_std,
         sepia_probability=args.sepia_p,
     )
-    train(arch, data_cfg, train_cfg, aug_cfg)
+    model_kwargs: dict[str, Any] = {}
+    if arch == "deeplab_resnet50":
+        model_kwargs["aspp_dropout"] = args.aspp_dropout
+
+    train(arch, data_cfg, train_cfg, aug_cfg, model_kwargs=model_kwargs)

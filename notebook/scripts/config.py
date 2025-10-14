@@ -22,12 +22,12 @@ class DataConfig:
 
 @dataclass
 class TrainConfig:
-    lr: float = 3e-4
-    epochs: int = 60
-    optimizer: str = "adam"
-    momentum: Optional[float] = None
-    weight_decay: Optional[float] = None
-    poly_power: Optional[float] = None
+    lr: float = 1e-2
+    epochs: int = 200
+    optimizer: str = "sgd"
+    momentum: Optional[float] = 0.9
+    weight_decay: Optional[float] = 5e-4
+    poly_power: Optional[float] = 0.9
     early_stop_patience: int = 10
     output_dir: str = "artifacts"
     exp_name: str = "cityscapes-seg-8cls"
