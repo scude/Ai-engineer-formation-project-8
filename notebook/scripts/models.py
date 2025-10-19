@@ -132,7 +132,7 @@ def deeplab_resnet50(
     imagenet: bool = True,
     aspp_dilations: Tuple[int, int, int] = (6, 12, 18),
     decoder_filters: int = 256,
-    aspp_dropout: float = 0.1,
+    aspp_dropout: float = 0.5,
     decoder_activation: str = "relu",
     aspp_activation: str = "relu",
     **_: Any,
