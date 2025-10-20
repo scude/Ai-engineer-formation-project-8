@@ -534,18 +534,37 @@ if __name__ == "__main__":
     # Aug params
     default_aug = DEFAULT_AUGMENT_CONFIG
     p.add_argument("--aug_enabled", type=int, default=int(default_aug.enabled))
-    p.add_argument("--hflip", type=int, default=int(default_aug.hflip))
-    p.add_argument("--vflip", type=int, default=int(default_aug.vflip))
-    p.add_argument("--rotate", type=float, default=default_aug.random_rotate_deg)
-    p.add_argument("--scale_min", type=float, default=default_aug.random_scale_min)
-    p.add_argument("--scale_max", type=float, default=default_aug.random_scale_max)
-    p.add_argument("--random_crop", type=int, default=int(default_aug.random_crop))
-    p.add_argument("--brightness", type=float, default=default_aug.brightness_delta)
-    p.add_argument("--contrast", type=float, default=default_aug.contrast_delta)
-    p.add_argument("--saturation", type=float, default=default_aug.saturation_delta)
-    p.add_argument("--hue", type=float, default=default_aug.hue_delta)
-    p.add_argument("--noise_std", type=float, default=default_aug.gaussian_noise_std)
-    p.add_argument("--sepia_p", type=float, default=default_aug.sepia_probability)
+    p.add_argument("--flip_prob", type=float, default=default_aug.horizontal_flip_prob)
+    p.add_argument("--rrc_scale_min", type=float, default=default_aug.random_resized_crop_scale[0])
+    p.add_argument("--rrc_scale_max", type=float, default=default_aug.random_resized_crop_scale[1])
+    p.add_argument("--rrc_ratio_min", type=float, default=default_aug.random_resized_crop_ratio[0])
+    p.add_argument("--rrc_ratio_max", type=float, default=default_aug.random_resized_crop_ratio[1])
+    p.add_argument(
+        "--rrc_lock_ratio",
+        type=int,
+        default=int(default_aug.lock_random_resized_crop_ratio),
+        help=(
+            "When set to 1 (default), force RandomResizedCrop to keep the dataset aspect ratio. "
+            "Disable by passing 0 to honour the configured ratio window and optional jitter."
+        ),
+    )
+    p.add_argument("--shift_prob", type=float, default=default_aug.shift_scale_rotate_prob)
+    p.add_argument("--shift_limit", type=float, default=default_aug.shift_limit)
+    p.add_argument("--scale_limit", type=float, default=default_aug.scale_limit)
+    p.add_argument("--rotate_limit", type=float, default=default_aug.rotate_limit)
+    p.add_argument("--jitter_brightness", type=float, default=default_aug.color_jitter_brightness)
+    p.add_argument("--jitter_contrast", type=float, default=default_aug.color_jitter_contrast)
+    p.add_argument("--jitter_saturation", type=float, default=default_aug.color_jitter_saturation)
+    p.add_argument("--jitter_hue", type=float, default=default_aug.color_jitter_hue)
+    p.add_argument("--blur_prob", type=float, default=default_aug.gaussian_blur_prob)
+    p.add_argument("--blur_kernel_min", type=int, default=default_aug.gaussian_blur_kernel[0])
+    p.add_argument("--blur_kernel_max", type=int, default=default_aug.gaussian_blur_kernel[1])
+    p.add_argument("--noise_prob", type=float, default=default_aug.gauss_noise_prob)
+    p.add_argument("--noise_var_min", type=float, default=default_aug.gauss_noise_var_limit[0])
+    p.add_argument("--noise_var_max", type=float, default=default_aug.gauss_noise_var_limit[1])
+    p.add_argument("--grid_prob", type=float, default=default_aug.grid_dropout_prob)
+    p.add_argument("--grid_ratio", type=float, default=default_aug.grid_dropout_ratio)
+    p.add_argument("--grid_unit", type=int, default=default_aug.grid_dropout_unit_size)
     p.add_argument("--aspp_dropout", type=float, default=0.5,
                    help="Dropout rate applied in the DeepLab ASPP head")
 
@@ -579,11 +598,26 @@ if __name__ == "__main__":
         precision_policy=args.precision_policy,
     )
     aug_cfg = AugmentConfig(
-        enabled=bool(args.aug_enabled), hflip=bool(args.hflip), vflip=bool(args.vflip),
-        random_rotate_deg=args.rotate, random_scale_min=args.scale_min, random_scale_max=args.scale_max,
-        random_crop=bool(args.random_crop), brightness_delta=args.brightness, contrast_delta=args.contrast,
-        saturation_delta=args.saturation, hue_delta=args.hue, gaussian_noise_std=args.noise_std,
-        sepia_probability=args.sepia_p,
+        enabled=bool(args.aug_enabled),
+        horizontal_flip_prob=args.flip_prob,
+        random_resized_crop_scale=(args.rrc_scale_min, args.rrc_scale_max),
+        random_resized_crop_ratio=(args.rrc_ratio_min, args.rrc_ratio_max),
+        lock_random_resized_crop_ratio=bool(args.rrc_lock_ratio),
+        shift_scale_rotate_prob=args.shift_prob,
+        shift_limit=args.shift_limit,
+        scale_limit=args.scale_limit,
+        rotate_limit=args.rotate_limit,
+        color_jitter_brightness=args.jitter_brightness,
+        color_jitter_contrast=args.jitter_contrast,
+        color_jitter_saturation=args.jitter_saturation,
+        color_jitter_hue=args.jitter_hue,
+        gaussian_blur_prob=args.blur_prob,
+        gaussian_blur_kernel=(args.blur_kernel_min, args.blur_kernel_max),
+        gauss_noise_prob=args.noise_prob,
+        gauss_noise_var_limit=(args.noise_var_min, args.noise_var_max),
+        grid_dropout_prob=args.grid_prob,
+        grid_dropout_ratio=args.grid_ratio,
+        grid_dropout_unit_size=args.grid_unit,
     )
     model_kwargs: dict[str, Any] = {}
     if arch == "deeplab_resnet50":

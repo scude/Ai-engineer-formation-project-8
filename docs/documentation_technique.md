@@ -33,11 +33,13 @@ Les images sont d'abord converties en PNG 16 bits sans perte puis harmonisées e
 
 L'environnement urbain comporte des variations fortes (météo, saison, heure, trafic). Sans augmentation, les modèles surapprennent rapidement la géométrie et l'éclairage des scènes Cityscapes, ce qui dégrade la généralisation. Nous utilisons la librairie **Albumentations** pour appliquer des transformations coordonnées sur l'image et le masque, en respectant les contraintes de segmentation (pas d'interpolation bilinéaire sur les masques). Le pipeline inclut :
 
+- Lorsque `lock_random_resized_crop_ratio` est actif (valeur par défaut), la chaîne géométrique démarre par un unique `RandomResizedCrop` configuré avec le ratio fixe de Cityscapes (1024/512) et l'intervalle d'aire demandé. Les bornes de `random_resized_crop_scale` sont automatiquement triées et contraintes dans \]0 ; 1] pour respecter les exigences d'Albumentations tout en conservant l'intuition « zoom 0,5× → 1,0× » ;
+- Lorsque l'on désactive explicitement `lock_random_resized_crop_ratio`, `RandomResizedCrop` est toujours utilisé mais l'intervalle de ratio est directement dérivé de `random_resized_crop_ratio` (multiplié par le ratio Cityscapes). Le paramètre `max_ratio_jitter` agit alors comme un garde-fou pour limiter l'écart relatif autour de 2,0 et rendre le réglage immédiatement visible dans les aperçus ;
+- Le redimensionnement final reste assuré par la fonction utilitaire TensorFlow (`resize_image_and_mask`) afin que chaque couple image/masque ressorte strictement en 512×1024, quelle que soit la configuration d'augmentation ;
 - `HorizontalFlip` (probabilité 0,5) pour exposer des scènes miroir, utile car la circulation et la disposition urbaine peuvent s'inverser ;
-- `ShiftScaleRotate` limité à ±10 ° et ±12 % d'échelle pour simuler la stabilisation imparfaite de la caméra ;
-- `RandomResizedCrop` avec facteur 0,8–1,0 pour forcer le modèle à se concentrer sur des sous-régions variées ;
-- `ColorJitter`, `RandomBrightnessContrast` et `GaussianNoise` pour renforcer la robustesse à la météo (pluie, brouillard) et aux variations de capteurs ;
-- un filtre `SoftSepia` personnalisé pour reproduire les dominantes colorimétriques rencontrées au coucher du soleil.
+- `ShiftScaleRotate` (translation ±10 %, zoom ±50 %, rotation ±15 °) pour simuler une caméra embarquée instable ;
+- `ColorJitter` (brightness 0,2, contrast 0,5, saturation 0,5, hue 0,2) couplé à `GaussianBlur` (p = 0,3) et `GaussNoise` (écart-type 1–5 px converti en fraction normalisée) pour couvrir les variations photométriques et de capteurs sans saturer l'image ;
+- `GridDropout` (ratio 0,5, maille 50 px, p = 0,3) qui masque aléatoirement des zones carrées afin de rendre le modèle plus résilient aux occultations.
 
 Albumentations a été retenu face à ses concurrents directs **imgaug** et **torchvision.transforms** (côté PyTorch) ou encore l'API `tf.image` / `KerasCV` car il offre un compromis optimal :
 
@@ -68,7 +70,7 @@ Le pipeline de données (`build_dataset`) s'appuie sur `tf.data` pour la lecture
 - Redimensionnement final vers la résolution cible avec interpolation bilinéaire (images) et *nearest neighbor* (masques).
 - Batching et préchargement asynchrone (`prefetch`) pour alimenter efficacement le GPU.
 
-Les augmentations combinent transformations géométriques (flip horizontal, rotations ±10°, redimensionnement aléatoire, recadrages proportionnels) et photométriques (ColorJitter paramétré, bruit gaussien, effet *SoftSepia* custom). Cette stratégie augmente la diversité des scènes urbaines et renforce la robustesse aux variations de luminosité et de perspective.
+Les augmentations combinent transformations géométriques (flip horizontal, recadrage redimensionné, translations/zooms/rotations) et photométriques (ColorJitter, flou gaussien, bruit gaussien, GridDropout). Cette stratégie augmente la diversité des scènes urbaines et renforce la robustesse aux variations de luminosité, de perspective et aux occultations partielles.
 
 Le script d'entraînement (`train.py`) compile chaque modèle avec une *loss* principale en entropie croisée (`SparseCategoricalCrossentropy` à réduction `NONE`) pondérée par le masque de validité, et ajoute au besoin une composante de Dice loss. Trois métriques sont suivies sur train et validation : **masked pixel accuracy**, **masked mean IoU** et **Dice coefficient**.
 
@@ -273,7 +275,7 @@ Cette conception garantit que l'API renvoie des résultats prêts à afficher (P
 
 L'aperçu des augmentations suit les mêmes transformations que l'entraînement :
 
-- Construction du pipeline Albumentations via `_build_albu_pipeline` et `A.Compose` (rotations, random resized crop, flips, jitter, bruit, filtre sepia doux).
+- Construction du pipeline Albumentations via `_build_albu_pipeline` et `A.Compose` (random resized crop, flip horizontal, ShiftScaleRotate, ColorJitter, flou/bruit gaussien, GridDropout).
 - Conversion de l'image d'entrée en `numpy.ndarray`, application des augmentations `samples` fois (par défaut 6) et emballage des résultats dans une liste d'`AugmentedImage` (nom + image).
 - Conversion finale en data URLs côté route Flask pour renvoyer le JSON.
 

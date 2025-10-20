@@ -38,40 +38,57 @@ class TrainConfig:
 
 @dataclass
 class AugmentConfig:
-    """Configuration for the Albumentations-based augmentation pipeline.
+    """Parameters of the Albumentations pipeline used for Cityscapes training.
 
-    The geometric parameters are converted to Albumentations transforms:
-
-    * ``random_rotate_deg`` becomes the symmetric degree range passed to
-      :class:`albumentations.Rotate` (``[-deg, +deg]``).
-    * ``random_scale_min`` and ``random_scale_max`` map directly to the
-      :class:`albumentations.RandomResizedCrop` ``scale`` interval (expressed as
-      a proportion of the original image area).
-
-    Photometric parameters map to :class:`albumentations.ColorJitter`. The
-    ``*_delta`` values follow the PyTorch-style semantics used by
-    Albumentations: a value of ``d`` yields multiplicative factors drawn from
-    ``[max(0, 1 - d), 1 + d]``. ``gaussian_noise_std`` represents the desired
-    standard deviation in the ``[0, 1]`` range and is converted to a variance
-    interval for :class:`albumentations.GaussNoise`.
+    The defaults mirror the production settings for DeepLabV3+ (ResNet-50) and
+    implement the data augmentation recipe requested in the project brief.  The
+    individual probabilities can be overridden in tests or experiments to
+    isolate the effect of a particular transform while keeping the rest of the
+    pipeline unchanged.
     """
 
-    # geometric
-    hflip: bool = True
-    vflip: bool = False
-    random_rotate_deg: float = 10.0    # rotation amplitude in degrees (symmetric)
-    random_scale_min: float = 0.75     # RandomResizedCrop scale lower bound
-    random_scale_max: float = 1.55     # RandomResizedCrop scale upper bound
-    random_crop: bool = True
-    # photometric (image-only)
-    brightness_delta: float = 0.8     # ColorJitter brightness factor delta
-    contrast_delta: float = 0.2        # ColorJitter contrast factor delta
-    saturation_delta: float = 0.3      # ColorJitter saturation factor delta
-    hue_delta: float = 0.1             # ColorJitter hue factor delta (0..0.5)
-    gaussian_noise_std: float = 0.10  # standard deviation of additive Gaussian noise in [0,1]
-    sepia_probability: float = 0.5    # probability of applying a subtle sepia tone
-    # enable/disable all aug
     enabled: bool = True
+
+    # geometric
+    horizontal_flip_prob: float = 0.5
+    random_resized_crop_scale: tuple[float, float] = (0.25, 0.6)
+    # Intervalle d'aire relatif utilisé par RandomResizedCrop. Les bornes sont
+    # automatiquement triées, bornées dans ]0, 1] pour respecter les exigences
+    # d'Albumentations et appliquées telles quelles lorsque le ratio n'est pas
+    # verrouillé.
+    random_resized_crop_ratio: tuple[float, float] = (0.75, 1.33)
+    # Verrouille le ratio cible sur la géométrie Cityscapes. Quand ce drapeau
+    # est actif (par défaut), RandomResizedCrop fonctionne avec un ratio fixe de
+    # 1024/512 tout en respectant la fenêtre d'échelle configurée.
+    lock_random_resized_crop_ratio: bool = True
+    # Budget optionnel permettant de rapprocher les bornes de ratio du format
+    # Cityscapes lorsque le verrou est désactivé. Une valeur nulle conserve le
+    # comportement historique tandis qu'une valeur positive limite l'écart
+    # relatif autour du ratio 2.0.
+    max_ratio_jitter: float = 0.0
+
+
+    shift_scale_rotate_prob: float = 1.0
+    shift_limit: float = 0.1
+    scale_limit: float = 0.5
+    rotate_limit: float = 15.0
+
+    # photometric
+    color_jitter_brightness: float = 0.2
+    color_jitter_contrast: float = 0.5
+    color_jitter_saturation: float = 0.5
+    color_jitter_hue: float = 0.2
+
+    # stochastic image corruption
+    gaussian_blur_prob: float = 0.3
+    gaussian_blur_kernel: tuple[int, int] = (3, 5)
+
+    gauss_noise_prob: float = 0.3
+    gauss_noise_var_limit: tuple[float, float] = (1.0, 25.0)
+
+    grid_dropout_prob: float = 0.3
+    grid_dropout_ratio: float = 0.2
+    grid_dropout_unit_size: int = 120
 
 DEFAULT_AUGMENT_CONFIG = AugmentConfig()
 
