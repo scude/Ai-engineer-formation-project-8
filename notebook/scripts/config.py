@@ -28,7 +28,7 @@ class TrainConfig:
     momentum: Optional[float] = 0.9
     weight_decay: Optional[float] = 5e-4
     poly_power: Optional[float] = 0.9
-    early_stop_patience: int = 10
+    early_stop_patience: int = 15
     output_dir: str = "artifacts"
     exp_name: str = "cityscapes-seg-8cls"
     arch: str = "unet_small"
