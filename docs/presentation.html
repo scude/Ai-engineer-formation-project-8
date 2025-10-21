@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Projet 6 - Classification automatique d’articles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/theme/dracula.min.css"
+        id="theme">
+    <style>
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #444;
+            margin: 0 !important;
+        }
+
+        .reveal section {
+            text-align: left;
+            font-size: 0.8em;
+        }
+
+        .content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2%;
+        }
+
+        .content div {
+            width: 48%;
+        }
+
+        h2,
+        h3 {
+            color: #FF6E78 !important;
+        }
+
+        li b {
+            color: #FF8714
+        }
+
+        strong {
+            color: #FF8714 !important
+        }
+
+        .reveal section {
+            font-size: 0.6em;
+        }
+
+        ul li::marker {
+            color: #FF8714;
+            font-weight: bold;
+        }
+
+        li {
+            font-size: 0.8em
+        }
+
+        .content H3 {
+            font-size: 1.3em;
+            padding-top: 0.6em;
+            margin-bottom: 0.2em !important;
+        }
+        
+        img {
+            border-radius: 12px;
+            background-color: transparent;
+            box-shadow: none;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <section>
+                <div style="float:left; min-height:2em; margin-right:0.3em;">
+                    <h3 style="color: white !important"><strong>📊 Projet 6</strong> -</h3>
+                </div>
+                <div>
+                    <h3 style="color: white !important">Classification automatique d’articles</h3>
+                </div>
+
+                <p style="margin-top: 2em; font-size: 1em;">
+                    <strong>Contexte :</strong><br />
+                    Sur notre marketplace e-commerce <strong>"Place de marché"</strong>, les vendeurs doivent renseigner
+                    eux-mêmes la catégorie de leurs produits,
+                    ce qui entraîne de nombreuses erreurs et une expérience utilisateur dégradée, tant côté vendeur
+                    qu’acheteur.
+                </p>
+
+                <p style="margin-top: 1.5em; font-size: 1em;">
+                    <strong>Objectif de la mission :</strong><br />
+                    Démontrer la <strong>faisabilité</strong> d’un moteur de <strong>classification automatique</strong>
+                    d’articles à partir
+                    des <strong>images</strong> et des <strong>descriptions textuelles</strong>, puis construire un
+                    <strong>modèle supervisé</strong> optimisé pour le traitement des images.
+                </p>
+            </section>
+
+            <section>
+                <h2 style="color: #FF8714; text-align: center;">🧭 Vue d’ensemble du projet</h2>
+
+                <p style="margin-top: 1em; font-size: 1em;">
+                    Le projet s’est articulé autour de deux grandes étapes :
+                </p>
+
+                <ul style="font-size: 0.95em; margin-top: 1em;">
+                    <li>🔍 <strong>Étude de faisabilité</strong> :<br />
+                        &nbsp;&nbsp;&nbsp;- Prétraitement des <strong>textes</strong> (TF-IDF, Word2Vec, BERT,
+                        USE)<br />
+                        &nbsp;&nbsp;&nbsp;- Prétraitement des <strong>images</strong> (CNN, ORB, SIFT)<br />
+                        &nbsp;&nbsp;&nbsp;- Clustering et évaluation</strong>
+                    </li>
+
+                    <li style="margin-top: 1em;">🧠 <strong>Classification supervisée d’images</strong> :<br />
+                        &nbsp;&nbsp;&nbsp;- Stratégies de <strong>data augmentation</strong><br />
+                        &nbsp;&nbsp;&nbsp;- Choix du Modèle à base de <strong>transfert learning (CNN)</strong><br />
+                    </li>
+                </ul>
+
+                <p style="margin-top: 2em; font-size: 0.9em;">
+                    ➕ Chaque étape a été implémentée et analysée dans des notebooks dédiés.
+                </p>
+            </section>
+
+
+
+            <section>
+                <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📂 Jeu de données e-commerce</h2>
+                <p style="font-size: 1.05em; text-align: center;">Structure et aperçu des données disponibles</p>
+
+                <div class="content"
+                    style="display: flex; justify-content: space-between; gap: 2%; font-size:0.9em; align-items: flex-start !important">
+
+                    <div style="width: 48%;">
+                        <h3 style="color: #FF6E78;">📊 Données disponibles</h3>
+                        <ul>
+                            <li>🧾 <strong>1050 produits</strong> avec 1050 images correspondantes</li>
+                            <li>📈 <strong>7 catégories équilibrées</strong> de 150 produits</li>
+                            <li>✅ Aucune donnée manquante</li>
+                            <li>⚠️ Des données sérialisées</li>
+
+                        </ul>
+
+                        <h3 style="color: #FF6E78;">🔠 Structure du dataset</h3>
+                        <ul>
+                            <li>🆔 <strong>Identifiants & URLs</strong></li>
+                            <ul>
+                                <li><code>uniq_id</code></li>
+                                <li><code>pid</code></li>
+                                <li><code>product_url</code></li>
+                            </ul>
+
+                            <li>🛍️ <strong>Informations produit</strong></li>
+                            <ul>
+                                <li><code>product_name</code></li>
+                                <li><code>product_category_tree</code></li>
+                                <li><code>brand</code></li>
+                                <li><code>product_specifications</code></li>
+                            </ul>
+
+                            <li>💬 <strong>Texte descriptif</strong></li>
+                            <ul>
+                                <li><code>description</code></li>
+                            </ul>
+                        </ul>
+                    </div>
+
+                    <div style="width: 48%;">
+
+                        <div style="text-align: center;">
+                            <img src=""
+                            
+                            
+                            alt="Nuage de mots des descriptions"
+                                style="max-width: 150% !important;"
+                                  
+                            />
+
+                        </div>
+                        <ul style="margin-top: 1em;">
+                            <li>💰 <strong>Prix & promotion</strong></li>
+                            <ul>
+                                <li><code>retail_price</code></li>
+                                <li><code>discounted_price</code></li>
+                            </ul>
+
+                            <li>⭐ <strong>Évaluations</strong></li>
+                            <ul>
+                                <li><code>product_rating</code></li>
+                                <li><code>overall_rating</code></li>
+                            </ul>
+
+                            <li>🖼️ <strong>Image & avantage</strong></li>
+                            <ul>
+                                <li><code>image</code></li>
+                                <li><code>is_FK_Advantage_product</code></li>
+                            </ul>
+
+                            <li>⏱️ <strong>Timestamp</strong></li>
+                            <ul>
+                                <li><code>crawl_timestamp</code></li>
+                            </ul>
+                        </ul>
+
+
+                    </div>
+                </div>
+            </section>
+
+
+
+
+           <section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧹 Nettoyage et enrichissement des descriptions</h2>
+  <p style="font-size: 1.05em; text-align: center;">Prétraitement approfondi des textes produits</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size:0.88em; align-items: flex-start !important">
+
+    <div style="width: 48%;">
+      <ul>
+
+        <li style="margin-top: 1em;">🌳 <strong>Catégorisation hiérarchique</strong> :
+          <ul>
+            <li>Décodage de la chaîne de catégories depuis <code>product_category_tree</code></li>
+            <li>Création des colonnes <code>cat_level_1</code> à <code>cat_level_7</code></li>
+          </ul>
+        </li>
+
+        <li style="margin-top: 1em;">🧼 <strong>Nettoyage textuel</strong> :
+          <ul>
+            <li>Suppression des caractères spéciaux et mise en minuscule</li>
+            <li>Filtrage par stopwords (standard + mots fréquents e-commerce)</li>
+          </ul>
+        </li>
+
+        <li style="margin-top: 1em;">🔠 <strong>Lemmatisation ciblée</strong> :
+          <ul>
+            <li>Tagging grammatical (POS)</li>
+            <li>Lemmatisation des <strong>noms</strong>, <strong>verbes</strong> et <strong>adjectifs</strong></li>
+            <li>Suppression des <strong>adverbes</strong> et mots non significatifs</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div style="width: 48%; text-align: center;">
+
+      <img src=""
+      \>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Nuage de mots après nettoyage & lemmatisation</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧠 Feature Engineering des descriptions</h2>
+  <p style="font-size: 1.05em; text-align: center;">Exploration comparative de 5 représentations vectorielles</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size:0.88em; align-items: flex-start !important">
+    <div style="width: 48%;">
+      <h3 style="color: #FF6E78;">📦 Méthodes testées</h3>
+      <ul>
+        <li>1️⃣ <strong>Bag-of-Words</strong> : vecteur de comptage brut des mots</li>
+        <li>2️⃣ <strong>TF-IDF</strong> : pondération par fréquence inverse de document</li>
+        <li>3️⃣ <strong>Word2Vec</strong> : projection des mots dans un espace sémantique continu</li>
+        <li>4️⃣ <strong>USE (Universal Sentence Encoder)</strong> : représentation vectorielle globale d'une phrase</li>
+        <li>5️⃣ <strong>BERT (Transformers)</strong> : contextualisation avancée mot par mot selon l’environnement</li>
+      </ul>
+
+      <p style="margin-top: 1.2em;">
+        🔍 Chaque méthode apporte un regard différent sur les textes : fréquence, sémantique, contexte global ou local.
+      </p>
+    </div>
+
+    <div style="width: 48%;">
+      <h3 style="color: #FF6E78;">🧪 Évaluation des clusters</h3>
+      <p><strong>Deux fonctions clés :</strong></p>
+
+      <ul>
+        <li>🔧 <code>analyze_clustering()</code> :
+          <ul style="margin-top: 0.3em;">
+            <li>Visualisation 2D (PCA, t-SNE)</li>
+            <li>Scores internes : Silhouette, Davies-Bouldin, CHI</li>
+            <li>Scores externes : ARI, NMI, matrice de confusion</li>
+            <li>WordClouds par cluster</li>
+          </ul>
+        </li>
+
+        <li style="margin-top: 0.8em;">⚙️ <code>analyze_clustering_pipeline()</code> :
+          <ul>
+            <li>Pipeline complet avec normalisation, PCA & KMeans</li>
+            <li>Appelle <code>analyze_clustering()</code></li>
+          </ul>
+        </li>
+      </ul>
+
+      <p style="margin-top: 1em;">
+        ✅ Ces outils permettent une <strong>comparaison rigoureuse</strong> des méthodes d’encodage textuel.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Résultats du clustering (descripteurs textuels)</h2>
+  <p style="font-size: 1em; text-align: center;">Comparaison des performances par méthode de vectorisation</p>
+
+  <table style="margin: 2em auto; font-size: 0.9em; border-collapse: collapse; width: 95%;">
+    <thead>
+      <tr style="background-color: #222; color: #FF6E78;">
+        <th style="padding: 8px; border: 1px solid #444;">Méthode</th>
+        <th style="padding: 8px; border: 1px solid #444;">Silhouette</th>
+        <th style="padding: 8px; border: 1px solid #444;">Davies-Bouldin</th>
+        <th style="padding: 8px; border: 1px solid #444;">Calinski-Harabasz</th>
+        <th style="padding: 8px; border: 1px solid #444;">ARI</th>
+        <th style="padding: 8px; border: 1px solid #444;">NMI</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #444;">Word2Vec</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.304</td>
+        <td style="padding: 8px; border: 1px solid #444;">1.239</td>
+        <td style="padding: 8px; border: 1px solid #444;">339.5</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.543</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.654</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #444;">USE</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.310</td>
+        <td style="padding: 8px; border: 1px solid #444;">1.241</td>
+        <td style="padding: 8px; border: 1px solid #444;">315.9</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.399</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.530</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #444;">DistilBERT</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.063</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">3.319</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">43.6</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.398</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.496</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #444;">TF-IDF</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.537</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.627</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">597.8</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.198</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.489</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #444;">Bag-of-Words</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.603</td>
+        <td style="padding: 8px; border: 1px solid #444;">0.907</td>
+        <td style="padding: 8px; border: 1px solid #444;">335.3</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.032</td>
+        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.224</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="text-align: center; font-size: 0.85em; margin-top: 1.2em;">
+    ✅ <strong>Word2Vec</strong> présente le meilleur compromis entre qualité de regroupement et cohérence métier.
+  </p>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — Bag-of-Words + PCA</h2>
+  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
+    <div style="width: 49%; text-align: center;">
+
+      <img 
+      src=""
+      
+      alt="Confusion BoW" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
+    </div>
+  </div>
+
+  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
+    🔎 Des clusters bien définis mathématiquement (silhouette élevée), mais une très faible correspondance avec les catégories réelles.
+  </p>
+</section>
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — Word2Vec + PCA</h2>
+  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
+    <div style="width: 49%; text-align: center;">
+      <img 
+      
+      src=""
+      alt="Silhouette Word2Vec" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
+    </div>
+    <div style="width: 49%; text-align: center;">
+      <img 
+      src=""
+      
+      alt="Confusion Word2Vec" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
+    </div>
+  </div>
+
+  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
+    ✅ Les performances sont nettement supérieures, avec une meilleure correspondance aux catégories réelles malgré une cohésion intra-cluster plus modérée.
+  </p>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🖼️ Extraction non supervisée de caractéristiques images</h2>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start; font-size: 0.88em;">
+    <div style="width: 65%;">
+
+      <h3 style="color: #FF6E78;">🔧 Deux approches</h3>
+      <ul>
+        <li><strong>ORB</strong> (OpenCV) — <em>Oriented FAST and Rotated BRIEF</em> :
+          <ul>
+            <li>Détection de points clés & descripteurs binaires robustes aux rotations</li>
+            <li>Open source, rapide, efficace pour objets avec texture / coins marqués</li>
+          </ul>
+        </li>
+        <li style="margin-top: 0.8em;"><strong>EfficientNetB0</strong> (TensorFlow Hub) :
+          <ul>
+            <li>Convolutional Neural Network pré-entraîné sur ImageNet</li>
+            <li>Utilisé en <strong>extraction de features</strong> sans supervision (sans fine-tuning)</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3 style="color: #FF6E78; margin-top: 1.2em;">⚙️ Prétraitement des images (TensorFlow)</h3>
+      <ul>
+        <li>📐 Redimensionnement à <code>(224×224)</code></li>
+        <li>📦 Pipeline optimisé avec <code>tf.data.Dataset</code> :
+          <ul>
+            <li>Chargement JPEG → redimension → normalisation via <code>preprocess_input</code></li>
+            <li>Batch de <code>32 images</code> avec <code>AUTOTUNE</code> pour la performance</li>
+          </ul>
+        </li>
+      </ul>
+
+    </div>
+
+    <div style="width: 55%; text-align: center;">
+      <img src=""
+      
+      alt="Prétraitement image EfficientNet" 
+      
+      \>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Illustration du pipeline de prétraitement image</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — ORB (OpenCV)</h2>
+  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
+    <div style="width: 49%; text-align: center;">
+      <img 
+      
+      src="" alt="Silhouette ORB" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
+    </div>
+    <div style="width: 49%; text-align: center;">
+      <img 
+      
+      src="" alt="Confusion ORB" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
+    </div>
+  </div>
+
+
+  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
+    ⚠️ Résultats très faibles avec ORB : absence de structure apparente dans les clusters.  
+    L’algorithme semble peu adapté à la diversité des produits présents dans le dataset.
+  </p>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — CNN (EfficientNet)</h2>
+  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
+    <div style="width: 49%; text-align: center;">
+
+      <img 
+      
+      src="" alt="Silhouette CNN" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
+    </div>
+    <div style="width: 49%; text-align: center;">
+
+      <img 
+      
+      src="" alt="Confusion CNN" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
+    </div>
+  </div>
+
+
+
+ <div style="margin-top: 1.5em; font-size: 0.95em;">
+     🧪 <strong>ARI</strong> : <code style="color: #00e676;"><strong>0.479</strong></code> - 
+    🧪 <strong>NMI</strong> : <code style="color: #00e676;"><strong>0.595</strong></code>
+
+  </div>
+  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
+    ✅ Les features extraits via CNN permettent une structuration bien plus cohérente des produits par catégorie, malgré une faible séparation visuelle des clusters (silhouette modérée).
+  </p>
+</section>
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🔀 Clustering — Fusion Texte + Image</h2>
+  <p style="font-size: 1em; text-align: center;">Représentation concaténée des embeddings textuels & visuels</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
+    <div style="width: 49%; text-align: center;">
+
+      <img 
+      
+      src="" alt="Silhouette Fusion" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
+    </div>
+    <div style="width: 49%; text-align: center;">
+
+      <img 
+      
+      src="" alt="Confusion Fusion" style="max-height: 350px;"
+      
+      \>
+      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
+    </div>
+  </div>
+
+  <div style="margin-top: 1.5em; font-size: 0.95em;">
+      🧪 <strong>ARI</strong> : <code style="color: #00e676;"><strong>0.601</strong></code>
+      🧪 <strong>NMI</strong> : <code style="color: #00e676;"><strong>0.687</strong></code>
+
+  </div>
+
+  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
+    ✅ La combinaison des représentations textuelles et visuelles permet un meilleur regroupement des produits, avec une nette amélioration des scores ARI/NMI.
+  </p>
+</section>
+
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧠 Préparation à la classification supervisée</h2>
+  <p style="font-size: 1em; text-align: center;">Prétraitement, data augmentation et architecture Transfer Learning</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 3%; font-size: 0.9em; align-items: flex-start;">
+    <div style="width: 60%;">
+      <h3 style="color: #FF6E78;">📂 Préparation des données</h3>
+      <ul>
+        <li>📊 Séparation <strong>stratifiée</strong> : 70% train / 15% validation / 15% test</li>
+        <li>🧼 Prétraitement pour EfficientNet : <code>preprocess_input</code> + resize</li>
+        <li>🧱 Construction de datasets <code>tf.data.Dataset</code> optimisés avec batching et prefetch</li>
+      </ul>
+
+      <h3 style="margin-top: 1em; color: #FF6E78;">🎨 Data Augmentation enrichie</h3>
+      <ul>
+        <li>Flip aléatoire, rotation, zoom, translation</li>
+        <li>Variations de contraste, luminosité, teinte, saturation</li>
+        <li>Bruit Gaussien & désaturation aléatoire</li>
+      </ul>
+
+      <h3 style="margin-top: 1.5em; color: #FF6E78;">📈 Entraînement & visualisation</h3>
+      <ul>
+        <li>Callbacks : <code>EarlyStopping</code>, <code>ReduceLROnPlateau</code>, <code>ModelCheckpoint</code></li>
+        <li>Suivi des performances : accuracy, F1, ARI, matrice de confusion</li>
+      </ul>
+    </div>
+
+    <div style="width: 38%; text-align: center;">
+      <h3 style="color: #FF6E78;">🔁 Modèles testés</h3>
+      <ul>
+        <li><code>VGG16</code>, <code>ResNet50</code>, <code>MobileNetV2</code></li>
+        <li><code>InceptionV3</code>, <code>DenseNet121</code></li>
+        <li><strong>EfficientNetB0</strong> & <strong>EfficientNetB3</strong></li>
+      </ul>
+
+      <br \>
+      <br \>
+      <br \>
+
+
+      <img 
+      src=""
+      
+      alt="Aperçu Data Augmentation" style="max-height: 230px; margin-top: 1em; border: 1px solid #444;"
+      
+      \>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.4em;">Images originales (haut) vs augmentées (bas)</p>
+    </div>
+  </div>
+</section>
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📈 Comparaison des architectures CNN testées</h2>
+
+  <div style="text-align: center; margin-top: 1em;">
+
+    <img 
+    
+    src=""
+    
+    alt="Heatmap performances modèles CNN" style="max-width: 100%; max-height: 350px; border: 1px solid #444;"
+    
+    \>
+    <p style="font-size: 0.75em; color: #888; margin-top: 0.4em;">
+      Résumé des performances sur test set (vert = meilleur)
+    </p>
+  </div>
+
+  <div style="font-size: 0.9em; margin-top: 1.5em; text-align: center;">
+    ✅ <strong>EfficientNetB3</strong> est le modèle le plus performant testé, atteignant un ARI de <strong>0.73</strong>.
+  </div>
+
+  <div style="font-size: 0.9em; margin-top: 1.5em; text-align: left;">
+    <ul>
+      <li>🧠 Les modèles performants (EfficientNet, VGG, ResNet) bénéficient pleinement du <strong>transfert learning</strong> tout en restant relativement compacts.</li>
+      <li>📉 Les modèles plus complexes (> 20M paramètres) comme Inception ou DenseNet peuvent <strong>surapprendre</strong> ou mal généraliser avec seulement 1050 images.</li>
+    </ul>
+  </div>
+</section>
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">✅ Évaluation du meilleur modèle - EfficientNetB3</h2>
+  <p style="font-size: 1em; text-align: center;">Performances sur le jeu de test</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 3%; font-size: 0.9em; align-items: flex-start;">
+
+    <!-- Résumé numérique -->
+    <div style="width: 50%;">
+      <ul>
+        <li>📉 <strong>Test Loss</strong> : <code>0.5058</code></li>
+        <li>✅ <strong>Test Accuracy</strong> : <code>84.81%</code></li>
+      </ul>
+
+      <h3 style="color: #FF6E78; margin-top: 1em;">📊 Classification report (macro avg)</h3>
+      <ul>
+        <li>🎯 <strong>Precision</strong> : <code>0.88</code></li>
+        <li>🎯 <strong>Recall</strong> : <code>0.87</code></li>
+        <li>🎯 <strong>F1-score</strong> : <code>0.87</code></li>
+      </ul>
+
+      <h3 style="color: #FF6E78; margin-top: 1em;">🏷️ Exemples de classes</h3>
+      <ul>
+        <li>📌 <strong>Watches</strong> : F1 = 0.98 (100% recall)</li>
+        <li>📌 <strong>Kitchen & Dining</strong> : F1 = 0.93</li>
+        <li>⚠️ <strong>Home Furnishing</strong> : F1 = 0.78</li>
+      </ul>
+    </div>
+
+    <!-- Matrice de confusion -->
+    <div style="width: 47%; text-align: center;">
+
+      <img 
+      
+      src=""
+      
+      alt="Matrice de confusion finale" style="max-height: 330px; border: 1px solid #444;"
+      
+      \>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Matrice de confusion sur les 7 catégories</p>
+    </div>
+  </div>
+
+  <!-- Conclusion -->
+  <p style="font-size: 0.95em; text-align: center; margin-top: 1.5em;">
+    ✅ Le modèle <strong>EfficientNetB3</strong> atteint des performances élevées et bien équilibrées,  
+    avec une précision globale proche de 85% et une excellente reconnaissance sur plusieurs classes clés.
+  </p>
+</section>
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🌟 Conclusion - Vers un moteur de classification automatique</h2>
+
+  <p style="font-size: 1em; text-align: center;">
+    L'ensemble des expérimentations confirme la <strong>faisabilité technique</strong> d’un moteur de classification supervisée d’articles e-commerce.
+  </p>
+
+  <div style="font-size: 0.9em; margin-top: 1.2em;">
+    <ul>
+      <li>🎯 Objectif : <strong>classer automatiquement les produits</strong> selon leur image et descriptions</li>
+
+      <li style="margin-top: 0.8em;">🔎 Approches testées :
+        <ul>
+          <li>Clustering non supervisé sur texte (Word2Vec), image (CNN, ORB), puis fusion des deux modalités</li>
+          <li>Apprentissage supervisé avec <strong>Transfer Learning</strong> sur plusieurs architectures CNN</li>
+        </ul>
+      </li>
+
+      <li style="margin-top: 0.8em;">📊 Résultats clés :
+        <ul>
+          <li>ARI = <code>0.60</code> en clustering multimodal (texte + image)</li>
+          <li>En supervisé, <strong>EfficientNetB3</strong> atteint une précision de <strong>84.8%</strong>, F1 > <strong>87%</strong>, ARI ≈ <strong>0.73</strong></li>
+          <li>La <strong>data augmentation avancée</strong> a été cruciale pour compenser la taille réduite du dataset</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <p style="font-size: 1em; text-align: center; margin-top: 1.8em;">
+    🚀 <strong>Conclusion :</strong> Le moteur de classification est <strong> réalisable</strong>,  
+    et prêt à évoluer vers un système intelligent de catégorisation produit.
+  </p>
+</section>
+
+
+<section>
+  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">💡 Recommandations pour la mise en œuvre</h2>
+  <p style="font-size: 1em; text-align: center;">Actions concrètes pour industrialiser et enrichir le moteur</p>
+
+  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size: 0.9em; align-items: flex-start !important">
+
+    <!-- Recos techniques -->
+    <div style="width: 48%;">
+      <h3 style="color: #FF6E78;">🛠️ Recommandations techniques</h3>
+      <ul>
+        <li>✔️ Implémenter le pipeline avec <strong>EfficientNetB3</strong></li>
+        <li>📦 Optimiser le format des images</li>
+        <li>🎨 Conserver la <strong>data augmentation enrichie</strong></li>
+        <li>🧪 Monitorer les performances</li>
+      </ul>
+    </div>
+
+    <!-- Recos stratégiques -->
+    <div style="width: 48%;">
+      <h3 style="color: #FF6E78;">📈 Recommandations stratégiques</h3>
+      <ul>
+        <li>📌 Collecter un plus grand volume d’images</li>
+        <li>🔁 Intégrer <strong>données textuelles</strong> dans un classifieur multimodal</li>
+        <li>⚠️ Ajouter une validation humaine pour les cas ambigus en phase initiale</li>
+        <li>🔐 S’assurer de la <strong>conformité RGPD</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="text-align: center; font-size: 0.85em; margin-top: 1.8em;">
+    ✅ Ce moteur peut être intégré dans la chaîne de mise en ligne produit avec un excellent potentiel d’amélioration continue.
+  </p>
+</section>
+
+
+
+
+            <section>
+                <h2>Merci pour votre attention !</h2>
+                <p>Des questions ? 💬</p>
+            </section>
+
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            controls: true,
+            progress: true,
+            center: true,
+            hash: true,
+            transition: 'none'
+        });
+    </script>
+</body>
+
+</html>
