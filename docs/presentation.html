@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Projet 6 - Classification automatique d’articles</title>
+    <title>Projet - Segmentation sémantique urbaine</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css">
@@ -15,6 +15,9 @@
             height: auto;
             border: 1px solid #444;
             margin: 0 !important;
+            border-radius: 12px;
+            background-color: transparent;
+            box-shadow: none;
         }
 
         .reveal section {
@@ -24,7 +27,7 @@
 
         .content {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 2%;
         }
@@ -46,31 +49,38 @@
             color: #FF8714 !important
         }
 
-        .reveal section {
-            font-size: 0.6em;
-        }
-
         ul li::marker {
             color: #FF8714;
             font-weight: bold;
         }
 
         li {
-            font-size: 0.8em
+            font-size: 0.85em
         }
 
-        .content H3 {
-            font-size: 1.3em;
-            padding-top: 0.6em;
+        .content h3 {
+            font-size: 1.2em;
+            padding-top: 0.4em;
             margin-bottom: 0.2em !important;
         }
-        
-        img {
-            border-radius: 12px;
-            background-color: transparent;
-            box-shadow: none;
+
+        table {
+            width: 90%;
+            border-collapse: collapse;
+            font-size: 0.85em;
         }
 
+        table th,
+        table td {
+            border: 1px solid #444;
+            padding: 0.6em 0.8em;
+            text-align: center;
+        }
+
+        table thead {
+            background-color: #222;
+            color: #FF6E78;
+        }
     </style>
 </head>
 
@@ -78,708 +88,277 @@
     <div class="reveal">
         <div class="slides">
             <section>
-                <div style="float:left; min-height:2em; margin-right:0.3em;">
-                    <h3 style="color: white !important"><strong>📊 Projet 6</strong> -</h3>
-                </div>
-                <div>
-                    <h3 style="color: white !important">Classification automatique d’articles</h3>
-                </div>
-
-                <p style="margin-top: 2em; font-size: 1em;">
-                    <strong>Contexte :</strong><br />
-                    Sur notre marketplace e-commerce <strong>"Place de marché"</strong>, les vendeurs doivent renseigner
-                    eux-mêmes la catégorie de leurs produits,
-                    ce qui entraîne de nombreuses erreurs et une expérience utilisateur dégradée, tant côté vendeur
-                    qu’acheteur.
-                </p>
-
-                <p style="margin-top: 1.5em; font-size: 1em;">
-                    <strong>Objectif de la mission :</strong><br />
-                    Démontrer la <strong>faisabilité</strong> d’un moteur de <strong>classification automatique</strong>
-                    d’articles à partir
-                    des <strong>images</strong> et des <strong>descriptions textuelles</strong>, puis construire un
-                    <strong>modèle supervisé</strong> optimisé pour le traitement des images.
-                </p>
+                <h2 style="color: white !important; text-align: center;">🚗 Future Vision Transport</h2>
+                <h3 style = "text-align: center;">Segmentation embarquée</h3>
+                <p style="margin-top: 2em; font-size: 1em; text-align: center;"><strong>Équipe R&amp;D Vision par ordinateur - cellule segmentation.</strong></p>
+                <p style="margin-top: 1.5em; font-size: 0.95em;"><strong>Mission :</strong> livrer un premier modèle 8 classes qui s'intègre entre le traitement temps réel des images et le module de décision embarqué.</p>
+                <p style="margin-top: 0.8em; font-size: 0.95em;"><strong>Livrables :</strong> entraînement Keras, API et UI Flask prêtes pour un déploiement Cloud.</p>
             </section>
 
             <section>
-                <h2 style="color: #FF8714; text-align: center;">🧭 Vue d’ensemble du projet</h2>
-
-                <p style="margin-top: 1em; font-size: 1em;">
-                    Le projet s’est articulé autour de deux grandes étapes :
-                </p>
-
-                <ul style="font-size: 0.95em; margin-top: 1em;">
-                    <li>🔍 <strong>Étude de faisabilité</strong> :<br />
-                        &nbsp;&nbsp;&nbsp;- Prétraitement des <strong>textes</strong> (TF-IDF, Word2Vec, BERT,
-                        USE)<br />
-                        &nbsp;&nbsp;&nbsp;- Prétraitement des <strong>images</strong> (CNN, ORB, SIFT)<br />
-                        &nbsp;&nbsp;&nbsp;- Clustering et évaluation</strong>
-                    </li>
-
-                    <li style="margin-top: 1em;">🧠 <strong>Classification supervisée d’images</strong> :<br />
-                        &nbsp;&nbsp;&nbsp;- Stratégies de <strong>data augmentation</strong><br />
-                        &nbsp;&nbsp;&nbsp;- Choix du Modèle à base de <strong>transfert learning (CNN)</strong><br />
-                    </li>
+                <h3 style="text-align: center;">🧭 Vue d’ensemble du projet</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li><strong>Contexte :</strong> maillon segmentation du système de perception pour véhicule autonome.</li>
+                    <li><strong>Objectif technique :</strong> entraîner un modèle Keras sur Cityscapes remappé en 8 familles pour fournir un masque temps réel.</li>
+                    <li><strong>Contraintes :</strong> budget GPU 8&nbsp;Go, compatibilité TensorFlow et latence réduite.</li>
+                    <li><strong>Livrables :</strong> modèle TensorFlow léger + API de prédiction + UI de démonstration connectée.</li>
+                    <li><strong>Validation :</strong> pipeline reproductible, métriques suivies et préparation au déploiement cloud.</li>
                 </ul>
-
-                <p style="margin-top: 2em; font-size: 0.9em;">
-                    ➕ Chaque étape a été implémentée et analysée dans des notebooks dédiés.
-                </p>
             </section>
 
-
-
             <section>
-                <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📂 Jeu de données e-commerce</h2>
-                <p style="font-size: 1.05em; text-align: center;">Structure et aperçu des données disponibles</p>
-
-                <div class="content"
-                    style="display: flex; justify-content: space-between; gap: 2%; font-size:0.9em; align-items: flex-start !important">
-
-                    <div style="width: 48%;">
-                        <h3 style="color: #FF6E78;">📊 Données disponibles</h3>
+                <h3 style="text-align: center;">🏙️ Dataset Cityscapes</h3>
+                <div class="content">
+                    <div>
+                        <h3>Points forts</h3>
                         <ul>
-                            <li>🧾 <strong>1050 produits</strong> avec 1050 images correspondantes</li>
-                            <li>📈 <strong>7 catégories équilibrées</strong> de 150 produits</li>
-                            <li>✅ Aucune donnée manquante</li>
-                            <li>⚠️ Des données sérialisées</li>
-
+                            <li>Images embarquées proches du flux caméra embarquée de nos véhicules.</li>
+                            <li>Annotations pixel à pixel sur 5 000 scènes urbaines variées.</li>
+                            <li>Couplage image RGB + masque dense idéal pour Keras.</li>
                         </ul>
-
-                        <h3 style="color: #FF6E78;">🔠 Structure du dataset</h3>
+                        <h3>Points de vigilance</h3>
                         <ul>
-                            <li>🆔 <strong>Identifiants & URLs</strong></li>
-                            <ul>
-                                <li><code>uniq_id</code></li>
-                                <li><code>pid</code></li>
-                                <li><code>product_url</code></li>
-                            </ul>
-
-                            <li>🛍️ <strong>Informations produit</strong></li>
-                            <ul>
-                                <li><code>product_name</code></li>
-                                <li><code>product_category_tree</code></li>
-                                <li><code>brand</code></li>
-                                <li><code>product_specifications</code></li>
-                            </ul>
-
-                            <li>💬 <strong>Texte descriptif</strong></li>
-                            <ul>
-                                <li><code>description</code></li>
-                            </ul>
+                            <li>Images lourdes (2048×1024) → pré-traitement et découpage nécessaires.</li>
+                            <li>Classes d'usagers et de mobilier nettement sous-représentées.</li>
+                            <li>Licence recherche → veille juridique pour usage commercial futur.</li>
                         </ul>
                     </div>
-
-                    <div style="width: 48%;">
-
-                        <div style="text-align: center;">
-                            <img src=""
-                            
-                            
-                            alt="Nuage de mots des descriptions"
-                                style="max-width: 150% !important;"
-                                  
-                            />
-
-                        </div>
-                        <ul style="margin-top: 1em;">
-                            <li>💰 <strong>Prix & promotion</strong></li>
-                            <ul>
-                                <li><code>retail_price</code></li>
-                                <li><code>discounted_price</code></li>
-                            </ul>
-
-                            <li>⭐ <strong>Évaluations</strong></li>
-                            <ul>
-                                <li><code>product_rating</code></li>
-                                <li><code>overall_rating</code></li>
-                            </ul>
-
-                            <li>🖼️ <strong>Image & avantage</strong></li>
-                            <ul>
-                                <li><code>image</code></li>
-                                <li><code>is_FK_Advantage_product</code></li>
-                            </ul>
-
-                            <li>⏱️ <strong>Timestamp</strong></li>
-                            <ul>
-                                <li><code>crawl_timestamp</code></li>
-                            </ul>
+                    <div>
+                        <h3>Remapping en 8 classes</h3>
+                        <ul>
+                            <li>Regroupement des 32 classes officielles selon les besoins métier.</li>
+                            <li>Conservation des 8 catégories prioritaires : <b>route</b>, <b>trottoir</b>, <b>bâtiments</b>, <b>végétation</b>, <b>ciel</b>, <b>mobilier</b>, <b>véhicules</b>, <b>usagers</b>.</li>
+                            <li>Objectif : limiter les confusions et accélérer l'inférence embarquée.</li>
                         </ul>
-
-
                     </div>
                 </div>
             </section>
 
-
-
-
-           <section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧹 Nettoyage et enrichissement des descriptions</h2>
-  <p style="font-size: 1.05em; text-align: center;">Prétraitement approfondi des textes produits</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size:0.88em; align-items: flex-start !important">
-
-    <div style="width: 48%;">
-      <ul>
-
-        <li style="margin-top: 1em;">🌳 <strong>Catégorisation hiérarchique</strong> :
-          <ul>
-            <li>Décodage de la chaîne de catégories depuis <code>product_category_tree</code></li>
-            <li>Création des colonnes <code>cat_level_1</code> à <code>cat_level_7</code></li>
-          </ul>
-        </li>
-
-        <li style="margin-top: 1em;">🧼 <strong>Nettoyage textuel</strong> :
-          <ul>
-            <li>Suppression des caractères spéciaux et mise en minuscule</li>
-            <li>Filtrage par stopwords (standard + mots fréquents e-commerce)</li>
-          </ul>
-        </li>
-
-        <li style="margin-top: 1em;">🔠 <strong>Lemmatisation ciblée</strong> :
-          <ul>
-            <li>Tagging grammatical (POS)</li>
-            <li>Lemmatisation des <strong>noms</strong>, <strong>verbes</strong> et <strong>adjectifs</strong></li>
-            <li>Suppression des <strong>adverbes</strong> et mots non significatifs</li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-
-    <div style="width: 48%; text-align: center;">
-
-      <img src=""
-      \>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Nuage de mots après nettoyage & lemmatisation</p>
-    </div>
-  </div>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧠 Feature Engineering des descriptions</h2>
-  <p style="font-size: 1.05em; text-align: center;">Exploration comparative de 5 représentations vectorielles</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size:0.88em; align-items: flex-start !important">
-    <div style="width: 48%;">
-      <h3 style="color: #FF6E78;">📦 Méthodes testées</h3>
-      <ul>
-        <li>1️⃣ <strong>Bag-of-Words</strong> : vecteur de comptage brut des mots</li>
-        <li>2️⃣ <strong>TF-IDF</strong> : pondération par fréquence inverse de document</li>
-        <li>3️⃣ <strong>Word2Vec</strong> : projection des mots dans un espace sémantique continu</li>
-        <li>4️⃣ <strong>USE (Universal Sentence Encoder)</strong> : représentation vectorielle globale d'une phrase</li>
-        <li>5️⃣ <strong>BERT (Transformers)</strong> : contextualisation avancée mot par mot selon l’environnement</li>
-      </ul>
-
-      <p style="margin-top: 1.2em;">
-        🔍 Chaque méthode apporte un regard différent sur les textes : fréquence, sémantique, contexte global ou local.
-      </p>
-    </div>
-
-    <div style="width: 48%;">
-      <h3 style="color: #FF6E78;">🧪 Évaluation des clusters</h3>
-      <p><strong>Deux fonctions clés :</strong></p>
-
-      <ul>
-        <li>🔧 <code>analyze_clustering()</code> :
-          <ul style="margin-top: 0.3em;">
-            <li>Visualisation 2D (PCA, t-SNE)</li>
-            <li>Scores internes : Silhouette, Davies-Bouldin, CHI</li>
-            <li>Scores externes : ARI, NMI, matrice de confusion</li>
-            <li>WordClouds par cluster</li>
-          </ul>
-        </li>
-
-        <li style="margin-top: 0.8em;">⚙️ <code>analyze_clustering_pipeline()</code> :
-          <ul>
-            <li>Pipeline complet avec normalisation, PCA & KMeans</li>
-            <li>Appelle <code>analyze_clustering()</code></li>
-          </ul>
-        </li>
-      </ul>
-
-      <p style="margin-top: 1em;">
-        ✅ Ces outils permettent une <strong>comparaison rigoureuse</strong> des méthodes d’encodage textuel.
-      </p>
-    </div>
-  </div>
-</section>
-
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Résultats du clustering (descripteurs textuels)</h2>
-  <p style="font-size: 1em; text-align: center;">Comparaison des performances par méthode de vectorisation</p>
-
-  <table style="margin: 2em auto; font-size: 0.9em; border-collapse: collapse; width: 95%;">
-    <thead>
-      <tr style="background-color: #222; color: #FF6E78;">
-        <th style="padding: 8px; border: 1px solid #444;">Méthode</th>
-        <th style="padding: 8px; border: 1px solid #444;">Silhouette</th>
-        <th style="padding: 8px; border: 1px solid #444;">Davies-Bouldin</th>
-        <th style="padding: 8px; border: 1px solid #444;">Calinski-Harabasz</th>
-        <th style="padding: 8px; border: 1px solid #444;">ARI</th>
-        <th style="padding: 8px; border: 1px solid #444;">NMI</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #444;">Word2Vec</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.304</td>
-        <td style="padding: 8px; border: 1px solid #444;">1.239</td>
-        <td style="padding: 8px; border: 1px solid #444;">339.5</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.543</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.654</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #444;">USE</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.310</td>
-        <td style="padding: 8px; border: 1px solid #444;">1.241</td>
-        <td style="padding: 8px; border: 1px solid #444;">315.9</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.399</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.530</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #444;">DistilBERT</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.063</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">3.319</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">43.6</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.398</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.496</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #444;">TF-IDF</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.537</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.627</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">597.8</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.198</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.489</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #444;">Bag-of-Words</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #00e676;">0.603</td>
-        <td style="padding: 8px; border: 1px solid #444;">0.907</td>
-        <td style="padding: 8px; border: 1px solid #444;">335.3</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.032</td>
-        <td style="padding: 8px; border: 1px solid #444; color: #ff5252;">0.224</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <p style="text-align: center; font-size: 0.85em; margin-top: 1.2em;">
-    ✅ <strong>Word2Vec</strong> présente le meilleur compromis entre qualité de regroupement et cohérence métier.
-  </p>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — Bag-of-Words + PCA</h2>
-  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
-    <div style="width: 49%; text-align: center;">
-
-      <img 
-      src=""
-      
-      alt="Confusion BoW" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
-    </div>
-  </div>
-
-  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
-    🔎 Des clusters bien définis mathématiquement (silhouette élevée), mais une très faible correspondance avec les catégories réelles.
-  </p>
-</section>
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — Word2Vec + PCA</h2>
-  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
-    <div style="width: 49%; text-align: center;">
-      <img 
-      
-      src=""
-      alt="Silhouette Word2Vec" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
-    </div>
-    <div style="width: 49%; text-align: center;">
-      <img 
-      src=""
-      
-      alt="Confusion Word2Vec" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
-    </div>
-  </div>
-
-  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
-    ✅ Les performances sont nettement supérieures, avec une meilleure correspondance aux catégories réelles malgré une cohésion intra-cluster plus modérée.
-  </p>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🖼️ Extraction non supervisée de caractéristiques images</h2>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start; font-size: 0.88em;">
-    <div style="width: 65%;">
-
-      <h3 style="color: #FF6E78;">🔧 Deux approches</h3>
-      <ul>
-        <li><strong>ORB</strong> (OpenCV) — <em>Oriented FAST and Rotated BRIEF</em> :
-          <ul>
-            <li>Détection de points clés & descripteurs binaires robustes aux rotations</li>
-            <li>Open source, rapide, efficace pour objets avec texture / coins marqués</li>
-          </ul>
-        </li>
-        <li style="margin-top: 0.8em;"><strong>EfficientNetB0</strong> (TensorFlow Hub) :
-          <ul>
-            <li>Convolutional Neural Network pré-entraîné sur ImageNet</li>
-            <li>Utilisé en <strong>extraction de features</strong> sans supervision (sans fine-tuning)</li>
-          </ul>
-        </li>
-      </ul>
-
-      <h3 style="color: #FF6E78; margin-top: 1.2em;">⚙️ Prétraitement des images (TensorFlow)</h3>
-      <ul>
-        <li>📐 Redimensionnement à <code>(224×224)</code></li>
-        <li>📦 Pipeline optimisé avec <code>tf.data.Dataset</code> :
-          <ul>
-            <li>Chargement JPEG → redimension → normalisation via <code>preprocess_input</code></li>
-            <li>Batch de <code>32 images</code> avec <code>AUTOTUNE</code> pour la performance</li>
-          </ul>
-        </li>
-      </ul>
-
-    </div>
-
-    <div style="width: 55%; text-align: center;">
-      <img src=""
-      
-      alt="Prétraitement image EfficientNet" 
-      
-      \>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Illustration du pipeline de prétraitement image</p>
-    </div>
-  </div>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — ORB (OpenCV)</h2>
-  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
-    <div style="width: 49%; text-align: center;">
-      <img 
-      
-      src="" alt="Silhouette ORB" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
-    </div>
-    <div style="width: 49%; text-align: center;">
-      <img 
-      
-      src="" alt="Confusion ORB" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
-    </div>
-  </div>
-
-
-  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
-    ⚠️ Résultats très faibles avec ORB : absence de structure apparente dans les clusters.  
-    L’algorithme semble peu adapté à la diversité des produits présents dans le dataset.
-  </p>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📊 Clustering — CNN (EfficientNet)</h2>
-  <p style="font-size: 1em; text-align: center;">Analyse des regroupements obtenus avec KMeans (k=7)</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
-    <div style="width: 49%; text-align: center;">
-
-      <img 
-      
-      src="" alt="Silhouette CNN" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
-    </div>
-    <div style="width: 49%; text-align: center;">
-
-      <img 
-      
-      src="" alt="Confusion CNN" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
-    </div>
-  </div>
-
-
-
- <div style="margin-top: 1.5em; font-size: 0.95em;">
-     🧪 <strong>ARI</strong> : <code style="color: #00e676;"><strong>0.479</strong></code> - 
-    🧪 <strong>NMI</strong> : <code style="color: #00e676;"><strong>0.595</strong></code>
-
-  </div>
-  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
-    ✅ Les features extraits via CNN permettent une structuration bien plus cohérente des produits par catégorie, malgré une faible séparation visuelle des clusters (silhouette modérée).
-  </p>
-</section>
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🔀 Clustering — Fusion Texte + Image</h2>
-  <p style="font-size: 1em; text-align: center;">Représentation concaténée des embeddings textuels & visuels</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; align-items: flex-start;">
-    <div style="width: 49%; text-align: center;">
-
-      <img 
-      
-      src="" alt="Silhouette Fusion" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Profil des scores de silhouette par cluster</p>
-    </div>
-    <div style="width: 49%; text-align: center;">
-
-      <img 
-      
-      src="" alt="Confusion Fusion" style="max-height: 350px;"
-      
-      \>
-      <p style="font-size: 0.8em; color: #888;">Correspondance clusters vs catégories réelles</p>
-    </div>
-  </div>
-
-  <div style="margin-top: 1.5em; font-size: 0.95em;">
-      🧪 <strong>ARI</strong> : <code style="color: #00e676;"><strong>0.601</strong></code>
-      🧪 <strong>NMI</strong> : <code style="color: #00e676;"><strong>0.687</strong></code>
-
-  </div>
-
-  <p style="font-size: 0.85em; color: #aaa; margin-top: 0.5em;">
-    ✅ La combinaison des représentations textuelles et visuelles permet un meilleur regroupement des produits, avec une nette amélioration des scores ARI/NMI.
-  </p>
-</section>
-
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🧠 Préparation à la classification supervisée</h2>
-  <p style="font-size: 1em; text-align: center;">Prétraitement, data augmentation et architecture Transfer Learning</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 3%; font-size: 0.9em; align-items: flex-start;">
-    <div style="width: 60%;">
-      <h3 style="color: #FF6E78;">📂 Préparation des données</h3>
-      <ul>
-        <li>📊 Séparation <strong>stratifiée</strong> : 70% train / 15% validation / 15% test</li>
-        <li>🧼 Prétraitement pour EfficientNet : <code>preprocess_input</code> + resize</li>
-        <li>🧱 Construction de datasets <code>tf.data.Dataset</code> optimisés avec batching et prefetch</li>
-      </ul>
-
-      <h3 style="margin-top: 1em; color: #FF6E78;">🎨 Data Augmentation enrichie</h3>
-      <ul>
-        <li>Flip aléatoire, rotation, zoom, translation</li>
-        <li>Variations de contraste, luminosité, teinte, saturation</li>
-        <li>Bruit Gaussien & désaturation aléatoire</li>
-      </ul>
-
-      <h3 style="margin-top: 1.5em; color: #FF6E78;">📈 Entraînement & visualisation</h3>
-      <ul>
-        <li>Callbacks : <code>EarlyStopping</code>, <code>ReduceLROnPlateau</code>, <code>ModelCheckpoint</code></li>
-        <li>Suivi des performances : accuracy, F1, ARI, matrice de confusion</li>
-      </ul>
-    </div>
-
-    <div style="width: 38%; text-align: center;">
-      <h3 style="color: #FF6E78;">🔁 Modèles testés</h3>
-      <ul>
-        <li><code>VGG16</code>, <code>ResNet50</code>, <code>MobileNetV2</code></li>
-        <li><code>InceptionV3</code>, <code>DenseNet121</code></li>
-        <li><strong>EfficientNetB0</strong> & <strong>EfficientNetB3</strong></li>
-      </ul>
-
-      <br \>
-      <br \>
-      <br \>
-
-
-      <img 
-      src=""
-      
-      alt="Aperçu Data Augmentation" style="max-height: 230px; margin-top: 1em; border: 1px solid #444;"
-      
-      \>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.4em;">Images originales (haut) vs augmentées (bas)</p>
-    </div>
-  </div>
-</section>
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">📈 Comparaison des architectures CNN testées</h2>
-
-  <div style="text-align: center; margin-top: 1em;">
-
-    <img 
-    
-    src=""
-    
-    alt="Heatmap performances modèles CNN" style="max-width: 100%; max-height: 350px; border: 1px solid #444;"
-    
-    \>
-    <p style="font-size: 0.75em; color: #888; margin-top: 0.4em;">
-      Résumé des performances sur test set (vert = meilleur)
-    </p>
-  </div>
-
-  <div style="font-size: 0.9em; margin-top: 1.5em; text-align: center;">
-    ✅ <strong>EfficientNetB3</strong> est le modèle le plus performant testé, atteignant un ARI de <strong>0.73</strong>.
-  </div>
-
-  <div style="font-size: 0.9em; margin-top: 1.5em; text-align: left;">
-    <ul>
-      <li>🧠 Les modèles performants (EfficientNet, VGG, ResNet) bénéficient pleinement du <strong>transfert learning</strong> tout en restant relativement compacts.</li>
-      <li>📉 Les modèles plus complexes (> 20M paramètres) comme Inception ou DenseNet peuvent <strong>surapprendre</strong> ou mal généraliser avec seulement 1050 images.</li>
-    </ul>
-  </div>
-</section>
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">✅ Évaluation du meilleur modèle - EfficientNetB3</h2>
-  <p style="font-size: 1em; text-align: center;">Performances sur le jeu de test</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 3%; font-size: 0.9em; align-items: flex-start;">
-
-    <!-- Résumé numérique -->
-    <div style="width: 50%;">
-      <ul>
-        <li>📉 <strong>Test Loss</strong> : <code>0.5058</code></li>
-        <li>✅ <strong>Test Accuracy</strong> : <code>84.81%</code></li>
-      </ul>
-
-      <h3 style="color: #FF6E78; margin-top: 1em;">📊 Classification report (macro avg)</h3>
-      <ul>
-        <li>🎯 <strong>Precision</strong> : <code>0.88</code></li>
-        <li>🎯 <strong>Recall</strong> : <code>0.87</code></li>
-        <li>🎯 <strong>F1-score</strong> : <code>0.87</code></li>
-      </ul>
-
-      <h3 style="color: #FF6E78; margin-top: 1em;">🏷️ Exemples de classes</h3>
-      <ul>
-        <li>📌 <strong>Watches</strong> : F1 = 0.98 (100% recall)</li>
-        <li>📌 <strong>Kitchen & Dining</strong> : F1 = 0.93</li>
-        <li>⚠️ <strong>Home Furnishing</strong> : F1 = 0.78</li>
-      </ul>
-    </div>
-
-    <!-- Matrice de confusion -->
-    <div style="width: 47%; text-align: center;">
-
-      <img 
-      
-      src=""
-      
-      alt="Matrice de confusion finale" style="max-height: 330px; border: 1px solid #444;"
-      
-      \>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">Matrice de confusion sur les 7 catégories</p>
-    </div>
-  </div>
-
-  <!-- Conclusion -->
-  <p style="font-size: 0.95em; text-align: center; margin-top: 1.5em;">
-    ✅ Le modèle <strong>EfficientNetB3</strong> atteint des performances élevées et bien équilibrées,  
-    avec une précision globale proche de 85% et une excellente reconnaissance sur plusieurs classes clés.
-  </p>
-</section>
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">🌟 Conclusion - Vers un moteur de classification automatique</h2>
-
-  <p style="font-size: 1em; text-align: center;">
-    L'ensemble des expérimentations confirme la <strong>faisabilité technique</strong> d’un moteur de classification supervisée d’articles e-commerce.
-  </p>
-
-  <div style="font-size: 0.9em; margin-top: 1.2em;">
-    <ul>
-      <li>🎯 Objectif : <strong>classer automatiquement les produits</strong> selon leur image et descriptions</li>
-
-      <li style="margin-top: 0.8em;">🔎 Approches testées :
-        <ul>
-          <li>Clustering non supervisé sur texte (Word2Vec), image (CNN, ORB), puis fusion des deux modalités</li>
-          <li>Apprentissage supervisé avec <strong>Transfer Learning</strong> sur plusieurs architectures CNN</li>
-        </ul>
-      </li>
-
-      <li style="margin-top: 0.8em;">📊 Résultats clés :
-        <ul>
-          <li>ARI = <code>0.60</code> en clustering multimodal (texte + image)</li>
-          <li>En supervisé, <strong>EfficientNetB3</strong> atteint une précision de <strong>84.8%</strong>, F1 > <strong>87%</strong>, ARI ≈ <strong>0.73</strong></li>
-          <li>La <strong>data augmentation avancée</strong> a été cruciale pour compenser la taille réduite du dataset</li>
-        </ul>
-      </li>
-    </ul>
-  </div>
-
-  <p style="font-size: 1em; text-align: center; margin-top: 1.8em;">
-    🚀 <strong>Conclusion :</strong> Le moteur de classification est <strong> réalisable</strong>,  
-    et prêt à évoluer vers un système intelligent de catégorisation produit.
-  </p>
-</section>
-
-
-<section>
-  <h2 style="font-size:1.2em; color: #FF8714; text-align: center;">💡 Recommandations pour la mise en œuvre</h2>
-  <p style="font-size: 1em; text-align: center;">Actions concrètes pour industrialiser et enrichir le moteur</p>
-
-  <div class="content" style="display: flex; justify-content: space-between; gap: 2%; font-size: 0.9em; align-items: flex-start !important">
-
-    <!-- Recos techniques -->
-    <div style="width: 48%;">
-      <h3 style="color: #FF6E78;">🛠️ Recommandations techniques</h3>
-      <ul>
-        <li>✔️ Implémenter le pipeline avec <strong>EfficientNetB3</strong></li>
-        <li>📦 Optimiser le format des images</li>
-        <li>🎨 Conserver la <strong>data augmentation enrichie</strong></li>
-        <li>🧪 Monitorer les performances</li>
-      </ul>
-    </div>
-
-    <!-- Recos stratégiques -->
-    <div style="width: 48%;">
-      <h3 style="color: #FF6E78;">📈 Recommandations stratégiques</h3>
-      <ul>
-        <li>📌 Collecter un plus grand volume d’images</li>
-        <li>🔁 Intégrer <strong>données textuelles</strong> dans un classifieur multimodal</li>
-        <li>⚠️ Ajouter une validation humaine pour les cas ambigus en phase initiale</li>
-        <li>🔐 S’assurer de la <strong>conformité RGPD</strong></li>
-      </ul>
-    </div>
-  </div>
-
-  <p style="text-align: center; font-size: 0.85em; margin-top: 1.8em;">
-    ✅ Ce moteur peut être intégré dans la chaîne de mise en ligne produit avec un excellent potentiel d’amélioration continue.
-  </p>
-</section>
-
-
-
+            <section>
+                <h3 style="text-align: center;">⚖️ Balance des classes</h3>
+                <div class="content" style="align-items: center;">
+                    <div>
+                        <ul style="font-size: 0.95em;">
+                            <li><strong>Constat :</strong> route, bâtiments et ciel représentent &gt;70% des pixels après remapping.</li>
+                            <li><strong>Impact :</strong> les classes usagers / mobilité douce risquent d'être mal détectées pour le module décision.</li>
+                            <li><strong>Réponses :</strong>
+                                <ul style="margin-top: 0.5em;">
+                                    <li>Pondération des pertes (class weighting, focal Tversky) ciblée sur les classes rares.</li>
+                                    <li>Découpage en tuiles 1024×512 pour équilibrer les lots transmis au GPU.</li>
+                                    <li>Sur-échantillonnage de scènes piétonnes et cyclistes pendant l'entraînement.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div style="text-align: center;">
+                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAHCCAIAAACYATqfAAAVW0lEQVR4nO3de2zV9d3A8S+lMEHksoFjLqGyRcaT+QyYq+AMoHJ3iaIDilc0DERnEAUBh5sZhvtNjZsXEDHoCLAJRJRbcKgZ6lRAH+YCWzBV57IxdwFDhNr2+eM8aRp6qDycT/sDeb3+Ojk9v57P53dK887vlLZJp06dEgAAcYqyHgAA4ItGYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEOx0DKw9e/asXLly1apVL7zwQq9evQr8bLfddltKqUuXLjfccMOx7jkBu3fvzuRYAKBwTTp16pT1DI1t9+7d559/fkqpa9euDz74YNeuXTdv3lxZWVlcXDxgwICSkpIT+2z13FPIkI18bObKy8sLeTkA4GRQnPUAWdqzZ0/Hjh137dq1bdu2Z555pqysrH379iml3bt3r1ixokePHtXV1XfddVeLFi1mzZrVunXrlStXLlmyJPeAjRs3/uEPf2jXrl3Lli2ffvrp66+/Ppc1d91111H3dOjQYf78+S1btjx06NCkSZP279+/e/fup556qrS0tHXr1osWLdq0aVNunvbt28+ZM6dNmzbl5eW5e9q0aTN9+vQOHTo0a9ZsxowZu3btuummm8rKyqqrq2fPnv3yyy+nlL785S/Pnj27TZs2FRUVd9xxx8cff5w7tkuXLrXHrn3gN77xjZrbb7/99uc+Re2Vn3322aMen/vohg0bevXq9dhjj5WWll5wwQXLli1bsmTJUTPUPbcffPDBUfcc9XIczxkAgJPNaX0Fq2/fviNHjmzSpMnWrVv//Oc/t2nTZuTIkePGjdu7d+/EiROfe+65q666asiQIfv371+3bt3evXu3bNlSWlqaUtq7d++YMWNeeuml2p/tWDceeuihbdu2Pfvss1dffXXfvn3vuOOOPXv2zJs3b8mSJZ06dVq5cuVFF12UG+yBBx7Ytm3b2rVrBw0a9PDDD5933nlz585dsWLFzp07zznnnKVLlw4ePHjHjh29e/fu2LHj7bfffuedd6aUFi5c+NJLL61bt27EiBHdunWbNm1a7nlnzJhRe+zaB/bt27fmdkVFxec+Re2V646UUvrTn/40YsSIv/3tb9u3bx86dOj+/fvXrl1bWlp61Ay5z1P73I4dO/aoe6qqqmq/HAcOHDie8QDgpHI6XsFq1qzZypUrmzVr9s1vfrN///7333//mjVrHn300R/96EcjR45MKVVXV2/cuDGl9Pzzz9977719+vS54oor+vXr16pVq9xnqKysfOWVV47z6Xr16jVp0qSU0vr166dOnZpSKioqWrVqVUrp/fffb926de1HTp48OaW0devWysrKlFKfPn1q3iNr0aJF06ZNf/vb3y5atGj58uU1bXHxxRdPmTIlpfSb3/xmw4YNNZ9t5syZtceufeCCBQtqbr/22muf+xS1V647UmVlZVVV1TvvvFNZWVlRUfHOO+9UVVW1aNGi7gx1z23de954443aL8fxnAEAONmcjoFVUVFRVlaWUho3btzw4cNTSsOHD1+9enX//v1zD6iqqqqqqsrdPnLkyCOPPLJhw4Zly5bV/NB6LimO8+maNGlSd4ADBw7kbldXV9fc37x585pDckcVFxffeOONhw8fLioqKi0traysnDhxYs+ePUePHn3llVfmuq1p06a5B1dWVh48eLDmsx01du0Da98+nqeovXLdx+c2yt04fPhw7TNT99QddW7z3lP75TjO8QDgpHI6/i/CGq+88kr37t2/9rWvnXHGGZs2bTrnnHM6duyYUiouLr700ktTSj/4wQ+2b9/+ne98Z/369V/60pdqAqi2oqKioqKieu559dVXL7/88pTS5Zdf/tprr6WUjhVnb7755sCBA1NKgwcPzjXTm2++mXsP7pJLLrntttvOOuusVatWvfXWWxMmTLjssstyR+3atSt31MiRI3OXsnJqj33UgbVvH89THDVk7cfXf4brnrqjzm3de456Of6/4wHAyeB0vIJVY9++fV27di0pKdm/f3/Pnj2Li4t79OiRUjp8+PCQIUNuueWWAwcOTJ48+aOPPlqzZs2777574MCB5s2b566y1Pj973//xBNP3Hzzzce6Z8aMGXPnzr3uuusOHTp099131zPP/fffv3DhwlGjRr311lu5Z5k+ffqsWbOuu+66ysrKKVOmHDx4cOvWrevWrSsqKnrwwQdrjpo7d+6NN9548ODB3Ltm77333o9//OPly5fXjH348OHaB55xxhk1t7ds2fK5T1HbUSPVf4Zr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MIEFABBMYAEABCvOeoBslJeXn8hhd9wTPUikE1yqttkdIgZpKAELvj4yYpCGUviCV+74XcgkDaTwBb/+RMggDaXwBZfc+FHIJA2k8AUPXP9CyCQNpPAFmxz6Q8gkDSTgu2hhSkpKsh2gMbmCBQAQrEmnTp2ynqFRZd7vAHB6Oq2uYJ12gQUA0NC8RQgAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQ7DT9Y89RrrnmmhtuuOGTTz45dOjQT37yk48++iil1Lp16/vuu2/w4MHf/va3sx6wUHkXHDFixIgRI1q1ajVz5syXX3456xkLUnfBFi1azJ8/v3379q1atVqwYMGLL76Y9YwFyfsK5lx66aWPPfZYly5dMhyvcHUX7N2796xZs/7yl7+klN5444358+dnPWNB6i5YVFR03333devWraKiYuLEie+//37WMxak7oIPP/xwhw4dUkrNmzfv3Llz9+7ds56xIHUXvPjiiydNmnTkyJGmTZvOnDlzx44dWc9IgxBYJ653795XXnnl1Vdf/emnn15yySULFiy45pprUkpLly5dv379oEGDsh6wUHkX/MpXvjJs2LARI0Z07tx58eLFl112WdZjnri8C44aNertt99+/PHHzz777LVr137/+9/PeswTd6wv0ZTSmWeeOX78+M8++yzbCQuUd8EOHTo8+uijTz/9dNbTBci74PXXX//JJ58MHTp00KBB995779ixY7Me88TlXfD222/PfXTkyJFf//rXs52wQHkXnDdvXllZ2QcffFBSUrJ06dJ+/fplPSYNwluEJ27s2LFz5sz59NNPU0rbtm0rLy8vLi5OKd16663Lli3LeLgIeRds27btU089VVVV9de//rVt27ZZz1iQvAuuWLHiySefTCl16dKloqIi6xkLcqwv0ZTS1KlTn3jiiaqqqkwHLFTeBc8+++y///3vWY8WI++CQ4cOXb16dUrpxRdfPNUvftTzJdqkSZNRo0ad6t9L8y74r3/9q127dimldu3atWzZMusZaSj+2POJe/3113v37n3kyJG8H929e/f555/fyCPFqn/BYcOG9ezZ8+67727kqQLVs+ADDzwwePDg0aNH/+53v2v8waIca8HS0tIxY8aMHTv2VP8qzbvgz372s5YtW5533nn//ve/p0+fXl5entV4hcu74M6dO3/5y1/279//P//5z/Tp0z/88MOsxitcPf8GBwwY0K9fv6lTpzb+VIHyLtitW7df//rX7733XufOnceNG7d169asxqNBuYJ14po2bZr1CA2rngVLSkpuueWW2bNnN+Y84epZcMKECePHjx82bFhjzhMu74LNmzefNm3aT3/608afJ1zeBaurq999990f/vCHq1evnjNnTuNPFehYr+CHH35YVla2Zs2aefPmNf5Uger5NzhmzJjHH3+8MYdpCHkXnDZt2vjx4wcOHDhhwoTBgwc3/lQ0DoF14vbt21fzY+xNmjRZuHBhtvOEO9aCZ5555i9+8YvJkyd//PHH2U0XIO+C06dPz71JsXXr1lP6J8zSMRYcMmRIq1atHnrooZUrV7Zs2XLRokWZzliQvAs++eSTzzzzTEppy5Yt3/rWt7Kcr2B5F9y/f//mzZtTSps3b+7atWuW8xXsWN9kevToceDAgX379mU3Woy8C3bt2nXTpk0ppY0bNw4YMCDL+WhIAuvELV++fNKkSc2bN08pXXHFFbkbXyR5F8x9j1i8ePHOnTuzHrBQeRc866yzBg4cmFK64IILTvXv73kXXLduXf/+/cvKysrKyg4dOnTnnXdmPeaJy7vg1KlTcz813L179z179mQ8YmHyLrh9+/YLL7wwpXThhRf+8Y9/zHjEwhzru+i4ceMWL16c6Wgx8i64b9++733veyml7373u6f0O7zUz/8iPHHPPffcueee+/zzz//zn//8xz/+8cV4z6W2vAsOHz68T58+bdu2vfbaaw8dOnTzzTdnPeaJy7vgvHnzFi1adNNNN1VUVEyaNCnrGQtyen6JLliwYP78+aNHjz58+PCUKVOynrEgx1pw3rx5EyZM+Oyzz+65556sZyxI3gXPPffcr371q6+//nrW0wXIu+A999zz85//PKVUXV09efLkrGekofghdwCAYN4iBAAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBg/wsIW7LZ8bD6kwAAAABJRU5ErkJggg==" alt="Graphique de répartition des classes" style="max-width: 95%;">
+                        <p style="font-size: 0.7em; color: #bbb; margin-top: 0.5em;">Espace réservé pour le graphique base64 de la balance des 8 classes.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🎨 Data augmentation - objectifs</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li><strong>Robustesse :</strong> tenir face aux variations météo rencontrées par les véhicules autonomes.</li>
+                    <li><strong>Détection fine :</strong> préserver les silhouettes partiellement visibles pour la prise de décision.</li>
+                    <li><strong>Équilibre :</strong> renforcer artificiellement les classes rares attendues par le système de sécurité.</li>
+                </ul>
+                <div style="margin-top: 1.5em; font-size: 0.9em;">
+                    <ul>
+                        <li>Géométrie : flips horizontaux, rotations ±15°, zoom progressif, translations contrôlées.</li>
+                        <li>Photométrie : jitter de couleur, variation gamma, ajout de bruit faible type capteur.</li>
+                        <li>Pipeline : implémentation <code>tf.data</code> pour rester compatible GPU 8 Go et reproductible.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🎨 Data augmentation - aperçu</h3>
+                <div style="text-align: center; margin-top: 1.5em;">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA4QAAAH0CAIAAADqkXSEAAAixklEQVR4nO3cZ5xU5f3w4XtmZwugoCjYEBQVxUKxFyD2KMZGQCxgiwU1xhZbrEFj0ASUJJaoGA1KVGzYQI1BRcVoKCKKNYh/FRQLoiDbZp4XoxvcXXgwAX6i1/XhxczZ+9z3OWdZ9rtndsi0bds2AQBAhGz0AQAA8MMlRgEACCNGAQAII0YBAAgjRgEACCNGAQAII0YBAAgjRgEACCNGAQAII0YBAAgjRgEACBMZo6+99todXzv22GOX+vxTp079r/dq3br1Y489trSP6Fs48cQTF7O9Q4cO/fv3X75H9NWVCVkaAPi+yrRt2zZq7alTp26++ebftfmLe/Xv37+8vPzGG29cFge25Iex5NuXg/9u6RkzZjz66KO1tbW5XG6PPfZo167dsjg2AGAF9R16mf7666//8Y9/nFIaNGhQr169WrRoMXTo0BEjRowcObJLly7FMVOnTv3d7343bty4fv36DR069Omnnz7mmGPqPnTeeefdddddI0eOXHfddeumbTjPkUceOXr06IcffrhHjx7FMauvvvqwYcPuuuuuwYMHF7fMnj37rrvu6tChw9133/3YY48tvErdzMXHdfteddVVkydPXvxxLuqkzjzzzDvvvHPMmDHFK3D66ac3bdr01ltvrXcAddvrVm/VqtUtt9wycuTIW265pVWrVo3O1vB8Gz2veldvUdez4YkPHjy47rI0vD6TJ09+4oknBgwY8Nhjj02aNGlJPh0AwA/HdyhGL7roolNPPbVz585rrbXWPffcc9555918882HHnroKaecMmjQoOKY8vLyESNG9O3b99JLL/3LX/7St2/f448/vvihsrKyKVOm9O7de8SIERdccEHdtA3n+cUvftG7d++TTz75wAMPLI45//zzH3jggd69ez/66KPl5eUppTFjxsyZM+eII464/PLL+/TpU7dKQ3X7jh49ulmzZos/zkZPqrS09NNPPz3ooIOOO+64iy++OKU0ZMiQ+fPn9+vXr94B1G2vW/2CCy4YNWpUnz59Ro0adf755zc6W8PzbXheDa/eoq5nwxOvu2iNmjlzZlVVVdeuXT/44INZs2YtyacDAPjhyAWuXVpaescddxQfX3755RMnTrznnntuvPHGXr16pZR69OhR95JukyZNSkpKamtr8/n8lClTamtrq6urp0yZks/nmzRpUhxTKBTGjBmTUnrooYeKWVbUcJ6xY8deeeWVw4cPP+2004rbt99++7POOiul9Pjjj9fW1tbte9lll+2333677bbbSiut1PD4s9nsovZd1HE2elLZbPbOO+9MKb3zzjvNmzdfeInFH0Bx9V/+8pcppQcffPCcc84pHlW92Rqeb8NpG169RV3PhZdu9KLVuz4ppXvvvfe666475phjDj744CX5dAAAPxyRMVpdXd23b9+FtzRt2rSmpqZ4fzGXyx1++OGVlZXZbHabbbYp5k51dXXxQWVlZT6fX3jffD5ft6Wqqqpue8N5zjjjjO222+5nP/vZ/vvvXyy5srKy4uBMJpPJZOr2vfbaa0ePHn3zzTfXvWWnLrCaN29eWlq6qH0XdZyLOqm5c+cWBxQKhYVPquEB1LPw0dYtXW+2hufbcNqGV29R17NOoyfe8PqklPr06TNy5Mjdd9+90SvQ8PAAgB+O79DL9O3bt+/WrdvRRx89cODATCbzr3/9a6+99kop7bzzzot6a/nCcrncLrvsklLaZ599nn322brt9eZZeeWV77zzzgkTJpx66qm77rpr3Zg999wzpbTXXnstnHedOnV68MEHy8vL68Jr7ty5HTp0SCkdcMABxdRb1L6NavSk6lV1UTabzWazDQ+guL1u2Pjx43v27JlS6tmz53PPPddwtkbPt+G0Da/eoq7nwufS8MQbXp+11lqroqLikUceWXvttddcc80l+XQAAD8c35WX6SdOnNi1a9dBgwZNmzbt9ddf79u378CBA3/7298edthhtbW1Z5999v93tsrKyr333vv444+fO3du8eXj6dOnn3TSSfXm+fzzzx9//PFRo0Zls9mhQ4cW973kkkuGDBlyxBFHTJgwYeG7gMOHD7/33ntfeeWVuXPnlpWVVVVVXXTRRddcc83HH388efLk4si6fSdOnDh//vzFH+SSn9Tzzz8/bNiwhgdQ3H7UUUcVh/3mN7+54oorDjvssPnz55955pkN52n0fBtO2/DqLep6Xn311Yu5aA2vT5cuXWbPnr3ddtvlcrmuXbvusMMO/99PBwDwwxH5XzstXVH/59HgwYNvvPHGadOmde7c+fzzz+/Tp8/yP4b/XcOr962uZ+B/OAUArNAi74x+P9x8880DBw5csGBBWVlZo2/0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" alt="Exemples d’augmentations" style="max-width: 85%;">
+                    <p style="font-size: 0.75em; color: #bbb; margin-top: 0.6em;">Mosaïque des transformations appliquées pendant l'entraînement.</p>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🧠 Modèles étudiés</h3>
+                <div class="content">
+                    <div>
+                        <h3>Architectures testées</h3>
+                        <ul>
+                            <li><strong>U-Net</strong> + ResNet50 - encodeur/décodeur symétrique pour capturer les contours précis.</li>
+                            <li><strong>DeepLabV3+</strong> (ResNet50 &amp; Xception) - modules ASPP multi-échelles pour couvrir routes et usagers.</li>
+                            <li><strong>HRNetV2</strong> - conserve une haute résolution tout au long du réseau pour les détails fins.</li>
+                            <li><strong>SegFormer</strong> B1 - backbone Transformer compact adapté aux ressources embarquées.</li>
+                            <li><strong>PSPNet</strong> ResNet101 - pooling pyramid pour comprendre le contexte global de la scène.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3>Contraintes matérielles</h3>
+                        <ul>
+                            <li>Cartes GPU 8 Go côté R&amp;D → batch size limité à 2 ou 3.</li>
+                            <li>Downscaling à 1024×512 pour respecter le budget RAM embarqué.</li>
+                            <li>Checkpoints fréquents + gradient accumulation pour stabiliser l'entraînement.</li>
+                        </ul>
+                        <p style="margin-top: 1em; font-size: 0.9em;">Chaque modèle entraîné 40 époques max avec <b>early stopping</b> afin de rester exploitable par la suite logicielle.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">📈 Résultats comparatifs</h3>
+                <p style="font-size: 0.95em; text-align: center;">Scores sur le jeu de validation (mIoU en %)</p>
+                <table style="margin: 2em auto 0;">
+                    <thead>
+                        <tr>
+                            <th>Modèle</th>
+                            <th>mIoU</th>
+                            <th>F1 macro</th>
+                            <th>Paramètres</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>U-Net ResNet50</td>
+                            <td>64.2</td>
+                            <td>78.5</td>
+                            <td>34 M</td>
+                        </tr>
+                        <tr>
+                            <td>DeepLabV3+ ResNet50</td>
+                            <td>69.8</td>
+                            <td>82.1</td>
+                            <td>43 M</td>
+                        </tr>
+                        <tr>
+                            <td>DeepLabV3+ Xception</td>
+                            <td>71.4</td>
+                            <td>83.0</td>
+                            <td>59 M</td>
+                        </tr>
+                        <tr>
+                            <td>SegFormer B1</td>
+                            <td>68.9</td>
+                            <td>81.4</td>
+                            <td>13 M</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 0.85em; text-align: center; margin-top: 1.2em;">🏁 DeepLabV3+ Xception offre le meilleur compromis précision / coût malgré une RAM sollicitée.</p>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🥇 Modèle retenu & optimisation</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li><strong>Choix final :</strong> DeepLabV3+ avec backbone Xception, un réseau qui observe l'image à plusieurs échelles pour repérer routes, véhicules et usagers.</li>
+                    <li><strong>Pourquoi lui :</strong> meilleur compromis précision/vitesse dans notre budget 8&nbsp;Go, exportable en TensorFlow SavedModel.</li>
+                    <li><strong>Optuna :</strong> une cinquantaine d'essais automatisés pour régler taux d'apprentissage, dropout ASPP et pondération des classes.</li>
+                    <li><strong>Réglages retenus :</strong> lr = 1e-4, batch = 2, dropout ASPP = 0.2, classe usagers pondérée ×3 pour éviter l'oubli des piétons.</li>
+                    <li><strong>Résultat :</strong> modèle prêt à brancher sur l'API avec un poids final de 160&nbsp;Mo.</li>
+                </ul>
+                <p style="margin-top: 1em; font-size: 0.9em;">Cette configuration stabilise les inférences et réduit la variance des scores de 12%.</p>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🥇 Impact de la data augmentation</h3>
+                <p style="font-size: 0.95em; text-align: center;">DeepLabV3+ Xception - évaluation sur validation</p>
+                <table style="margin: 2em auto 0; width: 75%;">
+                    <thead>
+                        <tr>
+                            <th>Configuration</th>
+                            <th>mIoU</th>
+                            <th>F1 macro</th>
+                            <th>Pixel accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sans augmentation</td>
+                            <td>66.3</td>
+                            <td>79.2</td>
+                            <td>89.5%</td>
+                        </tr>
+                        <tr>
+                            <td>Avec pipeline complet</td>
+                            <td>71.4</td>
+                            <td>83.0</td>
+                            <td>92.1%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 0.85em; text-align: center; margin-top: 1.2em;">📈 +5 points de mIoU grâce aux transformations mixtes géométriques et photométriques.</p>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🧩 API Flask</h3>
+                <div class="content">
+                    <div>
+                        <ul style="font-size: 0.95em;">
+                            <li><strong>/predict :</strong> en entrée une image &rarr; réponse JSON + masque colorisé.</li>
+                            <li><strong>Sorties :</strong> encodage base64, palette 8 classes, métriques rapides (mIoU locale).</li>
+                            <li><strong>Robustesse :</strong> contrôle format, taille (16&nbsp;Mo) et logs structurés pour l'équipe.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3>Pourquoi Flask ?</h3>
+                        <ul>
+                            <li>Framework léger déjà maîtrisé par l'équipe Future Vision Transport.</li>
+                            <li>Intégration simple avec TensorFlow et le traitement Python déjà en place.</li>
+                            <li>Déploiement direct sur dyno Heroku via <code>gunicorn</code>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🖥️ Interface utilisateur</h3>
+                <div class="content" style="align-items: center;">
+                    <div>
+                        <ul style="font-size: 0.95em;">
+                            <li><strong>Technos :</strong> Flask côté serveur, Bootstrap 5 &amp; JS léger côté client.</li>
+                            <li><strong>Fonctions :</strong> téléversement d'image, affichage masque et overlay en un clic.</li>
+                            <li><strong>Usage :</strong> outil commun pour l'équipe pour valider l'API en conditions réelles.</li>
+                        </ul>
+                        <p style="margin-top: 1em; font-size: 0.9em;">L'interface s'appuie sur <code>/predict</code> → cohérence entre démonstration et pipeline embarqué.</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <img src="data:image/png;base64,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" alt="Aperçu interface Flask" style="max-width: 95%;">
+                        <p style="font-size: 0.75em; color: #bbb; margin-top: 0.5em;">Maquette UI de test de segmentation pour Future Vision Transport.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">☁️ Déploiement Heroku</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li><strong>Procédé :</strong> image Docker unique → <code>heroku container:push</code> &amp; <code>release</code>.</li>
+                    <li><strong>Configuration :</strong> dyno gratuit + worker <code>gunicorn</code> pour les démonstrations client.</li>
+                    <li><strong>Limite RAM :</strong> 512&nbsp;Mo → chargement paresseux du modèle et nettoyage après chaque requête.</li>
+                    <li><strong>Suivi :</strong> dashboards Heroku + alertes temps de réponse pour l'équipe.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">✅ Conclusions</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li>La brique de segmentation 8 classes complète désormais la chaîne Future Vision Transport entre acquisition et décision.</li>
+                    <li>DeepLabV3+ Xception atteint 71&nbsp;% de mIoU : il distingue clairement routes, véhicules et usagers malgré un budget matériel restreint.</li>
+                    <li>Les augmentations de données assurent des prédictions fiables sous pluie, nuit et situations piétonnes.</li>
+                    <li>L'API Flask et l'interface web offrent à toute l'équipe un moyen simple de tester le modèle avant embarquement.</li>
+                </ul>
+                <p style="margin-top: 1.2em; font-size: 0.9em;">Prochaine étape : connecter ce module aux flux temps réel pour valider la latence bout en bout.</p>
+            </section>
+
+            <section>
+                <h3 style="text-align: center;">🚀 Pour aller plus loin</h3>
+                <ul style="margin-top: 1.5em; font-size: 0.95em;">
+                    <li>Enrichir la base avec les flux vidéo internes pour affiner la temporalité.</li>
+                    <li>Tester des architectures plus compactes (MobileNet, Fast-SCNN) pour embarqué.</li>
+                    <li>Connecter les masques à un module de suivi d'objets pour la décision.</li>
+                    <li>Préparer une montée en charge sur une plateforme Cloud GPU managée.</li>
+                </ul>
+            </section>
 
             <section>
                 <h2>Merci pour votre attention !</h2>
