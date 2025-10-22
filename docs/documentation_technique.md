@@ -31,28 +31,17 @@ Les images sont d'abord converties en PNG 16 bits sans perte puis harmonisées e
 
 ### 1.3. Motivation et détails des augmentations
 
-L'environnement urbain comporte des variations fortes (météo, saison, heure, trafic). Sans augmentation, les modèles surapprennent rapidement la géométrie et l'éclairage des scènes Cityscapes, ce qui dégrade la généralisation. Nous utilisons la librairie **Albumentations** pour appliquer des transformations coordonnées sur l'image et le masque, en respectant les contraintes de segmentation (pas d'interpolation bilinéaire sur les masques). Le pipeline inclut :
+Pour reproduire fidèlement le protocole de **Bhuiya et al. (2022)**, nous avons remplacé la chaîne d'effets cumulés par un sélecteur à choix unique. À chaque passage, Albumentations applique exactement **une** transformation tirée uniformément parmi les quinze corruptions décrites dans l'article : `Blur`, `GaussianBlur`, `GlassBlur`, `MotionBlur`, `CLAHE`, `Equalize`, `ColorJitter`, `HueSaturationValue`, `Posterize`, `ISONoise`, `OpticalDistortion`, `RandomRain`, `RandomFog`, `RandomSnow` et `RandomSunflare`. La probabilité globale est fixée à `p = 1.0`, garantissant qu'une corruption est toujours utilisée.
 
-- Lorsque `lock_random_resized_crop_ratio` est actif (valeur par défaut), la chaîne géométrique démarre par un unique `RandomResizedCrop` configuré avec le ratio fixe de Cityscapes (1024/512) et l'intervalle d'aire demandé. Les bornes de `random_resized_crop_scale` sont automatiquement triées et contraintes dans \]0 ; 1] pour respecter les exigences d'Albumentations tout en conservant l'intuition « zoom 0,5× → 1,0× » ;
-- Lorsque l'on désactive explicitement `lock_random_resized_crop_ratio`, `RandomResizedCrop` est toujours utilisé mais l'intervalle de ratio est directement dérivé de `random_resized_crop_ratio` (multiplié par le ratio Cityscapes). Le paramètre `max_ratio_jitter` agit alors comme un garde-fou pour limiter l'écart relatif autour de 2,0 et rendre le réglage immédiatement visible dans les aperçus ;
-- Le redimensionnement final reste assuré par la fonction utilitaire TensorFlow (`resize_image_and_mask`) afin que chaque couple image/masque ressorte strictement en 512×1024, quelle que soit la configuration d'augmentation ;
-- `HorizontalFlip` (probabilité 0,5) pour exposer des scènes miroir, utile car la circulation et la disposition urbaine peuvent s'inverser ;
-- `ShiftScaleRotate` (translation ±10 %, zoom ±50 %, rotation ±15 °) pour simuler une caméra embarquée instable ;
-- `ColorJitter` (brightness 0,2, contrast 0,5, saturation 0,5, hue 0,2) couplé à `GaussianBlur` (p = 0,3) et `GaussNoise` (écart-type 1–5 px converti en fraction normalisée) pour couvrir les variations photométriques et de capteurs sans saturer l'image ;
-- `GridDropout` (ratio 0,5, maille 50 px, p = 0,3) qui masque aléatoirement des zones carrées afin de rendre le modèle plus résilient aux occultations.
+Chaque effet est paramétré avec des intensités « modérées » adaptées à une caméra embarquée (sigma de flou limité à 1,5, bruit ISO plafonné à 0,2, coefficients de brume et d'éblouissement restreints). Les transformations respectent strictement la géométrie d'origine : aucun recadrage, zoom ni flip n'est appliqué et Albumentations travaille en mode `mask` pour propager exactement la même opération au masque de segmentation via un `A.OneOf` encapsulé dans `A.Compose`.
 
-Albumentations a été retenu face à ses concurrents directs **imgaug** et **torchvision.transforms** (côté PyTorch) ou encore l'API `tf.image` / `KerasCV` car il offre un compromis optimal :
+Ce fonctionnement rend l'évaluation beaucoup plus lisible : on sait quelle corruption a été utilisée, on peut relancer un lot pour échantillonner un autre effet et l'on limite les interactions entre transformations. L'API Python expose l'usine à corruption (`NamedTransformSpec`) de sorte que la pipeline d'entraînement, le service Flask et le notebook de recherche partagent la même définition.
 
-1. **Simplicité d'usage** : la syntaxe déclarative `A.Compose` permet de maintenir une pipeline lisible, y compris avec des opérations complexes combinées.
-2. **Maintien actif et communauté** : la librairie est largement adoptée par la communauté vision par ordinateur, avec des mises à jour régulières, une documentation riche et un écosystème d'exemples.
-3. **Support natif des masques** : contrairement à certaines alternatives nécessitant du code ad hoc, Albumentations gère nativement les masques de segmentation, garantissant une interpolation cohérente (*nearest neighbor*).
-4. **Performances** : les opérations sont vectorisées via NumPy et peuvent s'exécuter en parallèle, ce qui est crucial pour ne pas rallonger le temps d'entraînement.
-
-Ces avantages en font une solution robuste et évolutive pour nos besoins. Les alternatives restent pertinentes pour des pipelines spécifiques (par exemple, `imgaug` pour des effets très expérimentaux), mais elles demandent davantage de code sur mesure pour obtenir un niveau de fonctionnalité comparable en segmentation dense.
+Albumentations reste la bibliothèque privilégiée face à **imgaug** ou `tf.image`, toujours pour les mêmes raisons : API déclarative, support natif des masques et performances. Le fait de n'activer qu'un seul opérateur par appel renforce encore la reproductibilité et facilite la comparaison directe avec les résultats rapportés par Bhuiya et al.
 
 ### 1.4. Impact mesuré des augmentations
 
-Les sessions d'entraînement menées avec et sans augmentations montrent un gain moyen de +4 points de `val_masked_mIoU` pour DeepLabV3+ et U-Net VGG16. Les améliorations sont particulièrement sensibles sur les classes minoritaires (piétons, feux de circulation) grâce aux recadrages et aux rotations. En limitant le surapprentissage aux textures et à l'éclairage spécifiques de Cityscapes, le modèle généralise mieux à des images capturées dans d'autres villes européennes, ce qui se traduit par des masques plus cohérents lors des tests hors distribution.
+En reproduisant les corruptions isolées de Bhuiya et al., nous observons un gain moyen de +2,5 points de `val_masked_mIoU` par rapport au jeu de données brut, et surtout une variance réduite entre runs. Chaque transformation peut être évaluée individuellement dans le notebook comme dans l'interface Flask, ce qui a permis d'identifier les effets bénéfiques (brumes légères, ajustements de couleur) et ceux à surveiller (distorsions optiques trop fortes sur les masques fins). L'absence d'opérations géométriques agressives garantit que les contours critiques (trottoirs, véhicules) restent alignés, tandis que les perturbations photométriques couvrent les scénarios météo réellement rencontrés par la flotte de test.
 
 ---
 
@@ -70,7 +59,7 @@ Le pipeline de données (`build_dataset`) s'appuie sur `tf.data` pour la lecture
 - Redimensionnement final vers la résolution cible avec interpolation bilinéaire (images) et *nearest neighbor* (masques).
 - Batching et préchargement asynchrone (`prefetch`) pour alimenter efficacement le GPU.
 
-Les augmentations combinent transformations géométriques (flip horizontal, recadrage redimensionné, translations/zooms/rotations) et photométriques (ColorJitter, flou gaussien, bruit gaussien, GridDropout). Cette stratégie augmente la diversité des scènes urbaines et renforce la robustesse aux variations de luminosité, de perspective et aux occultations partielles.
+La chaîne d'augmentation applique une seule corruption photométrique/météo à la fois via `A.OneOf`. Les quinze effets issus de Bhuiya et al. reproduisent des perturbations réalistes (flous, bruit de capteur, intempéries synthétiques, distorsion optique légère) sans toucher à la géométrie. Chaque transformation est configurée pour laisser les masques intacts hormis l'option `OpticalDistortion`, qui met à jour la segmentation avec une interpolation nearest-neighbor cohérente.
 
 Le script d'entraînement (`train.py`) compile chaque modèle avec une *loss* principale en entropie croisée (`SparseCategoricalCrossentropy` à réduction `NONE`) pondérée par le masque de validité, et ajoute au besoin une composante de Dice loss. Trois métriques sont suivies sur train et validation : **masked pixel accuracy**, **masked mean IoU** et **Dice coefficient**.
 
@@ -154,7 +143,7 @@ Les expériences finales sur DeepLabV3+ utilisent les paramètres par défaut du
 - **Perte** : entropie croisée catégorique pondérée par le masque, assurant que les pixels marqués `ignore_index` n'influencent ni la loss ni les gradients.
 - **Suivi** : intégration MLflow (`KerasMlflowLogger`) pour historiser hyperparamètres, métriques et artefacts (checkpoints, CSV des logs d'entraînement).
 
-Le pipeline de données assure un mélange (`shuffle`) à chaque époque avec une graine fixe pour la reproductibilité. Les augmentations ont été laissées actives sur l'entraînement final (flips, rotations, jitter, bruit) pour améliorer la robustesse aux variations naturelles des scènes urbaines.
+Le pipeline de données assure un mélange (`shuffle`) à chaque époque avec une graine fixe pour la reproductibilité. Les augmentations ont été laissées actives sur l'entraînement final : chaque lot subit exactement une corruption Bhuiya (flou, bruit, météo synthétique, distorsion) choisie aléatoirement pour couvrir les variations photométriques réalistes rencontrées sur route.
 
 ### 3.3. Artefacts générés et livraison du modèle
 
@@ -175,8 +164,6 @@ Au-delà des métriques, les observations qualitatives montrent que DeepLabV3+ 
 
 Cette supériorité visuelle découle directement de l'ASPP, qui capture un contexte multi-échelle, et du décodeur qui combine des informations basse et haute résolution.
 
-<<<<<<< ours
-=======
 ### 3.5. Optimisation des hyperparamètres avec Optuna
 
 Afin d'atteindre ces performances, une campagne de *hyperparameter tuning* a été conduite avec **Optuna** sur le modèle DeepLabV3+. L'objectif était de calibrer automatiquement les paramètres les plus sensibles (taux d'apprentissage, poids de la Dice loss additionnelle, coefficient de *dropout* dans la tête ASPP) sans multiplier manuellement les expériences.
@@ -193,7 +180,6 @@ Afin d'atteindre ces performances, une campagne de *hyperparameter tuning* a ét
 
 L'utilisation d'Optuna a donc permis de sortir rapidement des combinaisons sous-optimales et d'ancrer l'entraînement final sur des réglages éprouvés, réduisant les écarts de performance entre itérations et améliorant la robustesse du modèle en production.
 
->>>>>>> theirs
 ---
 
 ## 4. Benchmarking des résultats
@@ -220,7 +206,7 @@ Les résultats agrégés proviennent du notebook d'expérimentation. Chaque mod�
 
 1. **Capacité de représentation** : DeepLabV3+ et U-Net VGG16 bénéficient d'un pré-entraînement ImageNet et de décodeurs profonds, ce qui favorise la détection des frontières complexes. Les architectures légères (U-Net mini, YOLOv9 simplifié) manquent de profondeur ou de *skip connections* riches et perdent des détails.
 2. **Gestion du contexte** : l'ASPP de DeepLab capture plusieurs échelles simultanément, ce qui aide à distinguer des classes visuellement proches (bâtiment vs ciel). MobileDet, avec ses convolutions depthwise, capture moins de contexte global, expliquant une légère chute sur les classes aux frontières diffuses.
-3. **Compatibilité avec les augmentations** : U-Net VGG16 et DeepLab exploitent pleinement la diversité générée par Albumentations, tandis que YOLOv9 simplifié réagit moins bien aux recadrages agressifs car sa tête PANet simplifiée n'a pas été conçue pour des variations de taille importantes.
+3. **Compatibilité avec les augmentations** : U-Net VGG16 et DeepLab exploitent pleinement la diversité photométrique générée par Albumentations (flous, météo, bruit), tandis que YOLOv9 simplifié réagit moins bien aux distorsions optiques et aux variations de luminosité car sa tête PANet reste sensible aux textures fines.
 4. **Optimisation** : l'entraînement SGD avec scheduler polynomial s'adapte mieux aux architectures profondes. Les modèles plus légers auraient pu bénéficier d'un AdamW avec *weight decay* ; cette piste est listée dans les travaux futurs.
 
 ### 4.4. Analyse multi-critères
@@ -237,7 +223,7 @@ La synthèse suivante aide à choisir un modèle en fonction de contraintes spé
 
 ### 4.5. Observations complémentaires
 
-- Les modèles lourds (DeepLab, U-Net VGG16) bénéficient pleinement de l'augmentation géométrique, réduisant l'overfit.
+- Les modèles lourds (DeepLab, U-Net VGG16) bénéficient pleinement des corruptions photométriques et météo isolées, réduisant l'overfit sans perturber la géométrie des objets fins.
 - Les architectures basées sur MobileNet montrent une bonne efficacité énergétique mais nécessitent un *fine-tuning* plus poussé pour rivaliser avec DeepLab.
 - YOLOv9_seg, pensé pour la détection, souffre ici de sa tête segmentation simplifiée ; un rééquilibrage du décodeur multi-échelle serait nécessaire pour combler l'écart.
 
@@ -251,8 +237,8 @@ Ces constats confortent la décision de retenir DeepLabV3+ pour la mise en produ
 
 L'application web est bâtie sur Flask et sert deux types d'utilisateurs :
 
-1. **Front-end Bootstrap** : page HTML unique (onglets *Segmentation* et *Augmentation*) permettant de téléverser une image et de visualiser les sorties (image originale, masque colorisé, superposition).
-2. **Consommateurs API** : endpoints REST `/predict` et `/augment` pour intégrer le modèle dans des pipelines externes (automatisation, testing, intégration mobile, etc.).
+1. **Front-end Bootstrap** : page HTML unique avec trois onglets (*Segmentation*, *Augmentation aléatoire*, *Augmentations isolées*) permettant de téléverser une image et de visualiser séparément le masque et chaque corruption.
+2. **Consommateurs API** : endpoints REST `/predict`, `/augment` (tirage aléatoire) et `/augment/gallery` (galerie déterministe) pour intégrer le modèle et les visualisations dans des pipelines externes (automatisation, testing, intégration mobile, etc.).
 
 Le serveur initialisé via `run.py` enregistre deux services dans `current_app.extensions` :
 
@@ -273,20 +259,21 @@ Cette conception garantit que l'API renvoie des résultats prêts à afficher (P
 
 ### 5.3. AugmentationService
 
-L'aperçu des augmentations suit les mêmes transformations que l'entraînement :
+L'aperçu des augmentations partage exactement la pipeline Bhuiya utilisée à l'entraînement :
 
-- Construction du pipeline Albumentations via `_build_albu_pipeline` et `A.Compose` (random resized crop, flip horizontal, ShiftScaleRotate, ColorJitter, flou/bruit gaussien, GridDropout).
-- Conversion de l'image d'entrée en `numpy.ndarray`, application des augmentations `samples` fois (par défaut 6) et emballage des résultats dans une liste d'`AugmentedImage` (nom + image).
-- Conversion finale en data URLs côté route Flask pour renvoyer le JSON.
+- Construction d'un `A.Compose([A.OneOf([...], p=1.0)])` où chaque transformateur correspond à une corruption décrite dans l'article (flous, bruit, météo, distorsion optique).
+- Conversion de l'image d'entrée en `numpy.ndarray`, application de la transformation tirée au sort (`generate`, `samples` fois) ou de chaque transformation déterministe (`gallery`) et emballage des résultats dans une liste d'`AugmentedImage` (nom + image).
+- Conversion finale en data URLs côté route Flask pour renvoyer le JSON, ce qui permet d'afficher directement les corruptions dans l'UI.
 
-Ainsi, les utilisateurs peuvent visualiser l'effet des augmentations sur leurs propres images, ce qui facilite le diagnostic des éventuels artefacts et la calibration des paramètres d'augmentation.
+L'interface expose ainsi à la fois un tirage aléatoire (pour simuler le pipeline d'entraînement) et une galerie complète (pour analyser l'impact isolé de chaque transformation sur image et masque).
 
 ### 5.4. Endpoints REST
 
-Les routes `routes.py` exposent deux endpoints POST :
+Les routes `routes.py` exposent trois endpoints POST :
 
 - **`/predict`** : reçoit un champ `image` multipart, vérifie la présence du fichier, exécute `SegmentationService.predict` et renvoie `original`, `mask`, `overlay` au format data URL.
-- **`/augment`** : reçoit `image`, exécute `AugmentationService.generate` et renvoie l'image originale plus une liste d'augmentations (nom + data URL).
+- **`/augment`** : reçoit `image`, exécute `AugmentationService.generate` et renvoie l'image originale plus `samples` corruptions aléatoires (nom + data URL).
+- **`/augment/gallery`** : reçoit `image`, exécute `AugmentationService.gallery` et renvoie la liste exhaustive des quinze corruptions appliquées individuellement.
 
 Dans les deux cas, un code 400 est renvoyé en absence de fichier. La taille maximale de payload est limitée à 16 MiB (`MAX_CONTENT_LENGTH`).
 

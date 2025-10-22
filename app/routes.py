@@ -35,6 +35,16 @@ def predict() -> Response:
     return jsonify(payload)
 
 
+def _serialize_preview(preview) -> dict[str, object]:
+    return {
+        "original": image_to_data_url(preview.original),
+        "augmentations": [
+            {"name": item.name, "image": image_to_data_url(item.image)}
+            for item in preview.augmentations
+        ],
+    }
+
+
 @bp.route("/augment", methods=["POST"])
 def augment() -> Response:
     file = request.files.get("image")
@@ -43,11 +53,15 @@ def augment() -> Response:
 
     service = current_app.extensions["augmentation_service"]
     preview = service.generate(file.read())
-    payload = {
-        "original": image_to_data_url(preview.original),
-        "augmentations": [
-            {"name": item.name, "image": image_to_data_url(item.image)}
-            for item in preview.augmentations
-        ]
-    }
-    return jsonify(payload)
+    return jsonify(_serialize_preview(preview))
+
+
+@bp.route("/augment/gallery", methods=["POST"])
+def augment_gallery() -> Response:
+    file = request.files.get("image")
+    if not file:
+        return jsonify({"error": "Image file is required"}), HTTPStatus.BAD_REQUEST
+
+    service = current_app.extensions["augmentation_service"]
+    preview = service.gallery(file.read())
+    return jsonify(_serialize_preview(preview))

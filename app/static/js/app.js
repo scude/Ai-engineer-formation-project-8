@@ -7,10 +7,15 @@
   const segmentationSubmit = document.getElementById('segmentation-submit');
   const segmentationLoader = document.getElementById('segmentation-loader');
 
-  const augmentationForm = document.getElementById('augmentation-form');
-  const augmentationResults = document.getElementById('augmentation-results');
-  const augmentationSubmit = document.getElementById('augmentation-submit');
-  const augmentationLoader = document.getElementById('augmentation-loader');
+  const augmentationRandomForm = document.getElementById('augmentation-random-form');
+  const augmentationRandomResults = document.getElementById('augmentation-random-results');
+  const augmentationRandomSubmit = document.getElementById('augmentation-random-submit');
+  const augmentationRandomLoader = document.getElementById('augmentation-random-loader');
+
+  const augmentationGalleryForm = document.getElementById('augmentation-gallery-form');
+  const augmentationGalleryResults = document.getElementById('augmentation-gallery-results');
+  const augmentationGallerySubmit = document.getElementById('augmentation-gallery-submit');
+  const augmentationGalleryLoader = document.getElementById('augmentation-gallery-loader');
 
   const errorAlert = document.getElementById('error-alert');
 
@@ -49,9 +54,9 @@
     }
   }
 
-  function createImageCard(title, src, alt) {
+  function createImageCard(title, src, alt, columnClass = 'col-md-4 col-sm-6') {
     const col = document.createElement('div');
-    col.className = 'col-md-4 col-sm-6';
+    col.className = columnClass;
     col.innerHTML = `
       <div class="card h-100">
         <div class="card-header">${title}</div>
@@ -59,6 +64,20 @@
       </div>
     `;
     return col;
+  }
+
+  function renderAugmentationResults(container, payload, columnClass) {
+    container.innerHTML = '';
+    if (payload.original) {
+      container.appendChild(
+        createImageCard('Original', payload.original, 'Original image', columnClass)
+      );
+    }
+    payload.augmentations.forEach((item) => {
+      container.appendChild(
+        createImageCard(item.name, item.image, item.name, columnClass)
+      );
+    });
   }
 
   segmentationForm?.addEventListener('submit', async (event) => {
@@ -78,28 +97,39 @@
     }
   });
 
-  augmentationForm?.addEventListener('submit', async (event) => {
+  augmentationRandomForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     hideError();
-    setLoading(augmentationSubmit, augmentationLoader, true);
+    setLoading(augmentationRandomSubmit, augmentationRandomLoader, true);
     try {
-      const payload = await submitForm(augmentationForm, '/augment');
-      augmentationResults.innerHTML = '';
-      if (payload.original) {
-        augmentationResults.appendChild(
-          createImageCard('Original', payload.original, 'Original image')
-        );
-      }
-      payload.augmentations.forEach((item) => {
-        augmentationResults.appendChild(
-          createImageCard(item.name, item.image, item.name)
-        );
-
-      });
+      const payload = await submitForm(augmentationRandomForm, '/augment');
+      renderAugmentationResults(
+        augmentationRandomResults,
+        payload,
+        'col-md-4 col-sm-6'
+      );
     } catch (error) {
       showError(error.message);
     } finally {
-      setLoading(augmentationSubmit, augmentationLoader, false);
+      setLoading(augmentationRandomSubmit, augmentationRandomLoader, false);
+    }
+  });
+
+  augmentationGalleryForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    hideError();
+    setLoading(augmentationGallerySubmit, augmentationGalleryLoader, true);
+    try {
+      const payload = await submitForm(augmentationGalleryForm, '/augment/gallery');
+      renderAugmentationResults(
+        augmentationGalleryResults,
+        payload,
+        'col-lg-3 col-md-4 col-sm-6'
+      );
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setLoading(augmentationGallerySubmit, augmentationGalleryLoader, false);
     }
   });
 })();

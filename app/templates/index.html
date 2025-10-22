@@ -8,8 +8,13 @@
     </button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="augmentation-tab" data-bs-toggle="tab" data-bs-target="#augmentation" type="button" role="tab" aria-controls="augmentation" aria-selected="false">
-      Augmentation
+    <button class="nav-link" id="augmentation-random-tab" data-bs-toggle="tab" data-bs-target="#augmentation-random" type="button" role="tab" aria-controls="augmentation-random" aria-selected="false">
+      Augmentation aléatoire
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="augmentation-gallery-tab" data-bs-toggle="tab" data-bs-target="#augmentation-gallery" type="button" role="tab" aria-controls="augmentation-gallery" aria-selected="false">
+      Augmentations isolées
     </button>
   </li>
 </ul>
@@ -65,26 +70,47 @@
       </ul>
     </div>
   </div>
-  <div class="tab-pane fade" id="augmentation" role="tabpanel" aria-labelledby="augmentation-tab" tabindex="0">
-    <form id="augmentation-form" class="mb-4" enctype="multipart/form-data">
+  <div class="tab-pane fade" id="augmentation-random" role="tabpanel" aria-labelledby="augmentation-random-tab" tabindex="0">
+    <form id="augmentation-random-form" class="mb-4" enctype="multipart/form-data">
       <div class="row g-3 align-items-center">
         <div class="col-auto">
-          <label for="augmentation-image" class="col-form-label">Image</label>
+          <label for="augmentation-random-image" class="col-form-label">Image</label>
         </div>
         <div class="col-auto">
-          <input class="form-control" type="file" accept="image/*" id="augmentation-image" name="image" required />
+          <input class="form-control" type="file" accept="image/*" id="augmentation-random-image" name="image" required />
         </div>
         <div class="col-auto d-flex align-items-center gap-2">
-          <button class="btn btn-primary" id="augmentation-submit" type="submit">
+          <button class="btn btn-primary" id="augmentation-random-submit" type="submit">
             Preview augmentations
           </button>
-          <div class="spinner-border spinner-border-sm text-primary d-none" id="augmentation-loader" role="status">
+          <div class="spinner-border spinner-border-sm text-primary d-none" id="augmentation-random-loader" role="status">
             <span class="visually-hidden">Processing…</span>
           </div>
         </div>
       </div>
     </form>
-    <div id="augmentation-results" class="row g-3"></div>
+    <div id="augmentation-random-results" class="row g-3"></div>
+  </div>
+  <div class="tab-pane fade" id="augmentation-gallery" role="tabpanel" aria-labelledby="augmentation-gallery-tab" tabindex="0">
+    <form id="augmentation-gallery-form" class="mb-4" enctype="multipart/form-data">
+      <div class="row g-3 align-items-center">
+        <div class="col-auto">
+          <label for="augmentation-gallery-image" class="col-form-label">Image</label>
+        </div>
+        <div class="col-auto">
+          <input class="form-control" type="file" accept="image/*" id="augmentation-gallery-image" name="image" required />
+        </div>
+        <div class="col-auto d-flex align-items-center gap-2">
+          <button class="btn btn-primary" id="augmentation-gallery-submit" type="submit">
+            Générer la galerie
+          </button>
+          <div class="spinner-border spinner-border-sm text-primary d-none" id="augmentation-gallery-loader" role="status">
+            <span class="visually-hidden">Processing…</span>
+          </div>
+        </div>
+      </div>
+    </form>
+    <div id="augmentation-gallery-results" class="row g-3"></div>
   </div>
 </div>
 <div class="alert alert-danger d-none" id="error-alert"></div>
