@@ -86,7 +86,7 @@ class AugmentConfig:
     gauss_noise_prob: float = 0.3
     gauss_noise_var_limit: tuple[float, float] = (1.0, 25.0)
 
-    grid_dropout_prob: float = 0.3
+    grid_dropout_prob: float = 0.0 #0.3
     grid_dropout_ratio: float = 0.2
     grid_dropout_unit_size: int = 120
 
