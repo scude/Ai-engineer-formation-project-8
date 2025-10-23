@@ -16,32 +16,25 @@ class DataConfig:
     seed: int = 1337
     batch_size: int = 2
     autotune: Optional[int] = None  # tf.data.AUTOTUNE set in code
-    deterministic_input: bool = False
-    cache_val: bool = False
-    cache_val_path: Optional[str] = None
     max_train_samples: Optional[int] = None
     max_val_samples: Optional[int] = None
     verbose: bool = True
 
 @dataclass
 class TrainConfig:
-    lr: float = 5e-4
-    epochs: int = 80
-    optimizer: str = "adamw"
-    momentum: Optional[float] = None
-    weight_decay: Optional[float] = 1e-4
-    poly_power: Optional[float] = None
-    lr_schedule: str = "cosine_warmup"
-    warmup_epochs: float = 5.0
-    min_lr_ratio: float = 0.05
-    cosine_cycles: float = 1.0
-    early_stop_patience: int = 12
+    lr: float = 1e-2
+    epochs: int = 200
+    optimizer: str = "sgd"
+    momentum: Optional[float] = 0.9
+    weight_decay: Optional[float] = 5e-4
+    poly_power: Optional[float] = 0.9
+    early_stop_patience: int = 15
     output_dir: str = "artifacts"
     exp_name: str = "cityscapes-seg-8cls"
     arch: str = "unet_small"
     loss: str = "ce"
     deterministic_ops: bool = False
-    precision_policy: str = "mixed_float16"
+    precision_policy: str = "float32"
 
 @dataclass
 class AugmentConfig:

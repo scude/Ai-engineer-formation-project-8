@@ -136,10 +136,10 @@ Le choix final s'est porté sur **DeepLabV3+** car il offre le meilleur équilib
 
 Les expériences finales sur DeepLabV3+ utilisent les paramètres par défaut du `TrainConfig`, ajustés ponctuellement :
 
-- **Optimiseur** : AdamW avec *weight decay* (1e-4) et scheduler cosinus à échauffement progressif. Les cinq premières époques servent de warm-up linéaire avant une décroissance cosinus sur 80 époques effectives, ce qui accélère la convergence tout en stabilisant les dernières itérations.
-- **Taux d'apprentissage initial** : 5e-4, modulé par le scheduler (minimum 5 % du taux initial en fin d'entraînement) pour maintenir un niveau d'exploration suffisant sans rallonger la durée de convergence.
-- **Nombre d'époques** : 80 avec *early stopping* (patience 12) sur la métrique `val_masked_mIoU`, ce qui réduit d'environ trois la durée d'entraînement totale par rapport au réglage historique tout en conservant les meilleures performances.
-- **Politique de précision** : `mixed_float16` activée par défaut afin de profiter des Tensor Cores et de limiter l'utilisation VRAM tout en gardant les poids en float32 via le *loss scaling* automatique.
+- **Optimiseur** : SGD avec momentum 0,9 et Nesterov, scheduler polynomial (`poly_power` = 0,9) pour décroître le taux d'apprentissage sur toute la durée de l'entraînement.
+- **Taux d'apprentissage initial** : 1e-2, adapté automatiquement par la décroissance polynomiale en fonction du nombre total d'itérations (`decay_steps = epochs × steps_per_epoch`).
+- **Nombre d'époques** : 200 avec *early stopping* (patience 10) sur la métrique `val_masked_mIoU` afin d'éviter d'entraîner au-delà du plateau de validation.
+- **Politique de précision** : `float32` par défaut, mais la configuration supporte `mixed_float16` en production pour accélérer l'inférence.
 - **Perte** : entropie croisée catégorique pondérée par le masque, assurant que les pixels marqués `ignore_index` n'influencent ni la loss ni les gradients.
 - **Suivi** : intégration MLflow (`KerasMlflowLogger`) pour historiser hyperparamètres, métriques et artefacts (checkpoints, CSV des logs d'entraînement).
 
@@ -207,7 +207,7 @@ Les résultats agrégés proviennent du notebook d'expérimentation. Chaque mod�
 1. **Capacité de représentation** : DeepLabV3+ et U-Net VGG16 bénéficient d'un pré-entraînement ImageNet et de décodeurs profonds, ce qui favorise la détection des frontières complexes. Les architectures légères (U-Net mini, YOLOv9 simplifié) manquent de profondeur ou de *skip connections* riches et perdent des détails.
 2. **Gestion du contexte** : l'ASPP de DeepLab capture plusieurs échelles simultanément, ce qui aide à distinguer des classes visuellement proches (bâtiment vs ciel). MobileDet, avec ses convolutions depthwise, capture moins de contexte global, expliquant une légère chute sur les classes aux frontières diffuses.
 3. **Compatibilité avec les augmentations** : U-Net VGG16 et DeepLab exploitent pleinement la diversité photométrique générée par Albumentations (flous, météo, bruit), tandis que YOLOv9 simplifié réagit moins bien aux distorsions optiques et aux variations de luminosité car sa tête PANet reste sensible aux textures fines.
-4. **Optimisation** : l'entraînement AdamW couplé au scheduler cosinus à warm-up maintient une vitesse d'apprentissage élevée durant les premières itérations puis réduit progressivement le pas de gradient sans à-coups. Ce réglage apporte un gain de stabilité sur toutes les architectures (DeepLabV3+, U-Net VGG16 et variantes légères) tout en divisant le temps d'entraînement par trois.
+4. **Optimisation** : l'entraînement SGD avec scheduler polynomial s'adapte mieux aux architectures profondes. Les modèles plus légers auraient pu bénéficier d'un AdamW avec *weight decay* ; cette piste est listée dans les travaux futurs.
 
 ### 4.4. Analyse multi-critères
 
