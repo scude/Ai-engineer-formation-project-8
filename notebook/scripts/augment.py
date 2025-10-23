@@ -114,7 +114,7 @@ def _bhuiya_transform_specs() -> Sequence[NamedTransformSpec]:
         NamedTransformSpec(
             name="RandomSnow",
             builder=lambda _ignore: A.RandomSnow(
-                snow_point_range=(0.3, 0.6),
+                snow_point_range=(0.05, 0.3),
                 brightness_coeff=2,
                 p=1.0,
             ),
@@ -145,7 +145,9 @@ def _build_albu_pipeline(
     if not cfg.enabled:
         return None
 
-    transforms = [spec.build(ignore_index) for spec in _bhuiya_transform_specs()]
+    transforms = [
+        spec.build(ignore_index) for spec in get_bhuiya_transform_specs()
+    ]
     return A.Compose([A.OneOf(transforms, p=1.0)])
 
 
