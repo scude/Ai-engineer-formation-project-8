@@ -139,7 +139,7 @@ Les expériences finales sur DeepLabV3+ utilisent les paramètres par défaut du
 - **Optimiseur** : AdamW avec *weight decay* (1e-4) et scheduler cosinus à échauffement progressif. Les cinq premières époques servent de warm-up linéaire avant une décroissance cosinus sur 80 époques effectives, ce qui accélère la convergence tout en stabilisant les dernières itérations.
 - **Taux d'apprentissage initial** : 5e-4, modulé par le scheduler (minimum 5 % du taux initial en fin d'entraînement) pour maintenir un niveau d'exploration suffisant sans rallonger la durée de convergence.
 - **Nombre d'époques** : 80 avec *early stopping* (patience 12) sur la métrique `val_masked_mIoU`, ce qui réduit d'environ trois la durée d'entraînement totale par rapport au réglage historique tout en conservant les meilleures performances.
-- **Politique de précision** : `float32` conservée par défaut pour privilégier la stabilité numérique. Le mode `mixed_float16` reste disponible en option lorsque la mémoire GPU constitue le principal goulot d'étranglement.
+- **Politique de précision** : `mixed_float16` activée par défaut afin de profiter des Tensor Cores et de limiter l'utilisation VRAM tout en gardant les poids en float32 via le *loss scaling* automatique.
 - **Perte** : entropie croisée catégorique pondérée par le masque, assurant que les pixels marqués `ignore_index` n'influencent ni la loss ni les gradients.
 - **Suivi** : intégration MLflow (`KerasMlflowLogger`) pour historiser hyperparamètres, métriques et artefacts (checkpoints, CSV des logs d'entraînement).
 
