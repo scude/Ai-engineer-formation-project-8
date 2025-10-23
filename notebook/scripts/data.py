@@ -80,5 +80,12 @@ def build_dataset(cfg: DataConfig, aug: AugmentConfig, split: str, training: boo
         if cfg.max_val_samples is not None:
             ds = ds.take(cfg.max_val_samples)
     ds = ds.map(_parse, num_parallel_calls=AUTOTUNE)
-    ds = ds.batch(cfg.batch_size).prefetch(AUTOTUNE)
+    if not training and cfg.cache_val:
+        cache_path = cfg.cache_val_path
+        ds = ds.cache(cache_path) if cache_path else ds.cache()
+    ds = ds.batch(cfg.batch_size)
+    options = tf.data.Options()
+    options.experimental_deterministic = cfg.deterministic_input or not training
+    ds = ds.with_options(options)
+    ds = ds.prefetch(AUTOTUNE)
     return ds

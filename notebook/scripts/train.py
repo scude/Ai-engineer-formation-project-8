@@ -6,7 +6,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # masque INFO & WARNING C++
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_XLA_FLAGS", "--xla_cpu_enable_xla=false")
 
-import re, shutil, argparse, csv, datetime, gc
+import re, shutil, argparse, csv, datetime, gc, math
 from dataclasses import replace
 from typing import Any, Callable, Optional
 import tensorflow as tf
@@ -56,6 +56,62 @@ def _best_ckpt(path: str, monitor: str):
             if s > score:
                 best, score = os.path.join(path, f), s
     return best, score
+
+
+class WarmupCosineSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+    """Cosine decay with an optional linear warm-up phase."""
+
+    def __init__(
+        self,
+        base_lr: float,
+        warmup_steps: int,
+        total_steps: int,
+        *,
+        min_lr_ratio: float = 0.0,
+        cycles: float = 1.0,
+    ) -> None:
+        if total_steps <= 0:
+            raise ValueError("total_steps must be > 0 for WarmupCosineSchedule")
+        if warmup_steps < 0:
+            raise ValueError("warmup_steps must be >= 0 for WarmupCosineSchedule")
+        if min_lr_ratio < 0.0:
+            raise ValueError("min_lr_ratio must be >= 0")
+        self.base_lr = float(base_lr)
+        self.warmup_steps = int(warmup_steps)
+        self.total_steps = int(total_steps)
+        self.min_lr_ratio = float(min_lr_ratio)
+        self.cycles = float(cycles)
+
+    def __call__(self, step: tf.Tensor) -> tf.Tensor:
+        step = tf.cast(step, tf.float32)
+        warmup_steps = tf.cast(self.warmup_steps, tf.float32)
+        total_steps = tf.cast(self.total_steps, tf.float32)
+        base_lr = tf.cast(self.base_lr, tf.float32)
+        min_lr = base_lr * tf.cast(self.min_lr_ratio, tf.float32)
+
+        if self.warmup_steps > 0:
+            warmup_progress = tf.clip_by_value(step / tf.maximum(warmup_steps, 1.0), 0.0, 1.0)
+            warmup_lr = base_lr * warmup_progress
+        else:
+            warmup_lr = base_lr
+
+        decay_steps = tf.maximum(total_steps - warmup_steps, 1.0)
+        post_warmup_step = tf.maximum(step - warmup_steps, 0.0)
+        progress = tf.clip_by_value(post_warmup_step / decay_steps, 0.0, 1.0)
+        cosine_argument = math.pi * progress * self.cycles
+        cosine_decay = 0.5 * (1.0 + tf.cos(cosine_argument))
+        decayed_lr = min_lr + (base_lr - min_lr) * cosine_decay
+
+        return tf.where(step < warmup_steps, warmup_lr, decayed_lr)
+
+    def get_config(self):
+        return {
+            "base_lr": self.base_lr,
+            "warmup_steps": self.warmup_steps,
+            "total_steps": self.total_steps,
+            "min_lr_ratio": self.min_lr_ratio,
+            "cycles": self.cycles,
+        }
 
 def build_optimizer(name: str, lr, momentum: float | None = None, weight_decay: float | None = None):
     name = name.lower()
@@ -196,6 +252,21 @@ def train(model_name: str = "unet_small",
         train_ds = _cast_inputs(train_ds)
         val_ds = _cast_inputs(val_ds)
 
+    steps_per_epoch = None
+    cardinality = None
+    try:
+        cardinality = tf.data.experimental.cardinality(train_ds)
+        card_value = int(cardinality.numpy())
+        if card_value >= 0:
+            steps_per_epoch = card_value
+    except (TypeError, AttributeError):
+        try:
+            card_value = int(cardinality)
+            if card_value >= 0:
+                steps_per_epoch = card_value
+        except Exception:
+            steps_per_epoch = None
+
     # model
     input_shape = (data_cfg.height, data_cfg.width, 3)
     model = build_model(model_name, data_cfg.num_classes, input_shape, **model_kwargs)
@@ -284,12 +355,12 @@ def train(model_name: str = "unet_small",
         ),
     ]
     effective_lr = train_cfg.lr
+    lr_schedule_name = "constant"
+    schedule_choice = (train_cfg.lr_schedule or "").lower()
     if train_cfg.poly_power is not None:
-        steps_per_epoch = tf.data.experimental.cardinality(train_ds)
-        if steps_per_epoch == tf.data.experimental.INFINITE_CARDINALITY:
+        if steps_per_epoch is None:
             total_steps = train_cfg.epochs
         else:
-            steps_per_epoch = int(steps_per_epoch.numpy()) if hasattr(steps_per_epoch, "numpy") else int(steps_per_epoch)
             total_steps = max(1, steps_per_epoch * max(train_cfg.epochs, 1))
         effective_lr = keras.optimizers.schedules.PolynomialDecay(
             initial_learning_rate=train_cfg.lr,
@@ -297,6 +368,22 @@ def train(model_name: str = "unet_small",
             end_learning_rate=0.0,
             power=train_cfg.poly_power,
         )
+        lr_schedule_name = "polynomial_decay"
+    else:
+        if schedule_choice in {"cosine_warmup", "warmup_cosine"} and steps_per_epoch is not None:
+            warmup_epochs = max(0.0, float(train_cfg.warmup_epochs))
+            warmup_steps = int(round(warmup_epochs * steps_per_epoch))
+            total_steps = max(1, int(train_cfg.epochs * max(steps_per_epoch, 1)))
+            min_ratio = max(0.0, float(train_cfg.min_lr_ratio))
+            cycles = max(1e-3, float(train_cfg.cosine_cycles))
+            effective_lr = WarmupCosineSchedule(
+                base_lr=train_cfg.lr,
+                warmup_steps=warmup_steps,
+                total_steps=total_steps,
+                min_lr_ratio=min_ratio,
+                cycles=cycles,
+            )
+            lr_schedule_name = "cosine_warmup"
 
     opt = build_optimizer(
         train_cfg.optimizer,
@@ -333,7 +420,6 @@ def train(model_name: str = "unet_small",
     if mlflow_enabled:
         max_train_samples = getattr(train_cfg, "max_train_samples", None)
         max_val_samples = getattr(train_cfg, "max_val_samples", None)
-        schedule = "polynomial_decay" if train_cfg.poly_power is not None else "constant"
         model_params = {f"model__{k}": v for k, v in model_kwargs.items()}
         params = {
             "arch": model_name,
@@ -346,8 +432,12 @@ def train(model_name: str = "unet_small",
             "optimizer": train_cfg.optimizer,
             "momentum": train_cfg.momentum,
             "weight_decay": train_cfg.weight_decay,
-            "lr_scheduler": schedule,
+            "lr_scheduler": lr_schedule_name,
             "poly_power": train_cfg.poly_power,
+            "lr_schedule_choice": schedule_choice,
+            "warmup_epochs": train_cfg.warmup_epochs,
+            "min_lr_ratio": train_cfg.min_lr_ratio,
+            "cosine_cycles": train_cfg.cosine_cycles,
             "aug": vars(aug_cfg),
             "ignore_index": data_cfg.ignore_index,
             "loss": loss_choice,
@@ -506,13 +596,47 @@ if __name__ == "__main__":
     p.add_argument("--batch_size", type=int, default=2)
     p.add_argument("--max_train_samples", type=int, default=None)
     p.add_argument("--max_val_samples", type=int, default=None)
-    p.add_argument("--epochs", type=int, default=200)
-    p.add_argument("--lr", type=float, default=1e-2)
-    p.add_argument("--optimizer", default="sgd", choices=["adam","adamw","sgd"])
-    p.add_argument("--momentum", type=float, default=0.9)
-    p.add_argument("--weight_decay", type=float, default=5e-4)
-    p.add_argument("--poly_power", type=float, default=0.9,
-                   help="Polynomial decay power. Set to a negative value to disable the scheduler.")
+    p.add_argument("--epochs", type=int, default=80)
+    p.add_argument("--lr", type=float, default=5e-4)
+    p.add_argument("--optimizer", default="adamw", choices=["adam","adamw","sgd"])
+    p.add_argument("--momentum", type=float, default=None)
+    p.add_argument("--weight_decay", type=float, default=1e-4)
+    p.add_argument(
+        "--poly_power",
+        type=float,
+        default=None,
+        help=(
+            "Polynomial decay power. When provided it overrides --lr_schedule."
+        ),
+    )
+    p.add_argument(
+        "--lr_schedule",
+        default="cosine_warmup",
+        choices=["constant", "cosine_warmup"],
+        help=(
+            "Learning-rate schedule to apply when --poly_power is not set. "
+            "'cosine_warmup' enables a short warm-up followed by cosine decay, "
+            "while 'constant' keeps the base learning rate for the full training."
+        ),
+    )
+    p.add_argument(
+        "--warmup_epochs",
+        type=float,
+        default=5.0,
+        help="Number of epochs used for linear LR warm-up when cosine scheduling is active.",
+    )
+    p.add_argument(
+        "--min_lr_ratio",
+        type=float,
+        default=0.05,
+        help="Final learning rate expressed as a fraction of the base LR for cosine scheduling.",
+    )
+    p.add_argument(
+        "--cosine_cycles",
+        type=float,
+        default=1.0,
+        help="Number of cosine cycles to run after the warm-up phase (1.0 corresponds to a single decay).",
+    )
     p.add_argument("--loss", default="ce", choices=["ce", "dice", "ce+dice"])
     p.add_argument(
         "--deterministic_ops",
@@ -521,7 +645,7 @@ if __name__ == "__main__":
     )
     p.add_argument(
         "--precision_policy",
-        default="float32",
+        default="mixed_float16",
         choices=["float32", "mixed_float16"],
         help=(
             "Mixed precision policy to apply. 'mixed_float16' keeps variables in float32 while "
@@ -584,7 +708,7 @@ if __name__ == "__main__":
         max_train_samples=args.max_train_samples,
         max_val_samples=args.max_val_samples
     )
-    poly_power = None if args.poly_power is not None and args.poly_power < 0 else args.poly_power
+    poly_power = args.poly_power
     train_cfg = TrainConfig(
         lr=args.lr,
         epochs=args.epochs,
@@ -592,6 +716,10 @@ if __name__ == "__main__":
         momentum=args.momentum,
         weight_decay=args.weight_decay,
         poly_power=poly_power,
+        lr_schedule=args.lr_schedule,
+        warmup_epochs=args.warmup_epochs,
+        min_lr_ratio=args.min_lr_ratio,
+        cosine_cycles=args.cosine_cycles,
         arch=arch,
         loss=loss_choice,
         deterministic_ops=bool(args.deterministic_ops),
