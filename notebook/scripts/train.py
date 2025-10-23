@@ -645,7 +645,7 @@ if __name__ == "__main__":
     )
     p.add_argument(
         "--precision_policy",
-        default="mixed_float16",
+        default="float32",
         choices=["float32", "mixed_float16"],
         help=(
             "Mixed precision policy to apply. 'mixed_float16' keeps variables in float32 while "
