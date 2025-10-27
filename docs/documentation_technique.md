@@ -202,14 +202,25 @@ Les résultats agrégés proviennent du notebook d'expérimentation. Chaque mod�
 - **Pixel accuracy** : la hiérarchie reflète celle du mIoU. DeepLabV3+ atteint 0,87, montrant que plus de 87 % des pixels valides sont correctement prédits. U-Net VGG16 maintient 0,80, MobileDet 0,78. Les modèles plus légers restent sous 0,75, indiquant des difficultés à préserver la cohérence globale.
 - **Dice coefficient** : l'écart entre train et val reste modéré pour DeepLab (0,965 vs 0,716), signe d'une bonne généralisation. U-Net VGG16 montre un écart plus important (0,923 vs 0,633), révélateur d'un surapprentissage partiel. MobileDet se situe à 0,600 sur validation, acceptable pour un modèle compact tandis que YOLOv9_seg peine à dépasser 0,49.
 
-### 4.3. Pourquoi ces performances ?
+### 4.3. Influence des augmentations sur DeepLabV3+
+
+Les deux entraînements finaux ont été rejoués avec et sans la pipeline d'augmentations photométriques pour quantifier leur impact. Les mesures (issues du suivi MLflow) montrent un léger surcoût temporel mais un gain tangible en généralisation.
+
+| Configuration | Durée d'entraînement | `val_dice_coef` | `val_masked_mIoU` | `val_pix_acc` | Conclusions |
+| :------------ | :------------------: | :-------------: | :----------------: | :------------: | :--------- |
+| **DeepLabV3+ (sans augmentation)** | 3,9 h | 0,840 | 0,818 | 0,945 | Les images brutes suffisent pour apprendre la structure globale, mais le modèle perd ≈1 point de Dice et laisse filer des imprécisions sur les bords fins. |
+| **DeepLabV3+ (avec augmentation météo/optique)** | 6,7 h | **0,849** | **0,831** | **0,948** | Les perturbations météo et couleur forcent le réseau à généraliser : les masques restent nets et stables malgré ≈3 h d'entraînement supplémentaires. |
+
+> 💡 *Conclusion : investir quelques heures GPU supplémentaires dans des variations météo/lumière renforce la robustesse du modèle et évite des erreurs visibles en production.*
+
+### 4.4. Pourquoi ces performances ?
 
 1. **Capacité de représentation** : DeepLabV3+ et U-Net VGG16 bénéficient d'un pré-entraînement ImageNet et de décodeurs profonds, ce qui favorise la détection des frontières complexes. Les architectures légères (U-Net mini, YOLOv9 simplifié) manquent de profondeur ou de *skip connections* riches et perdent des détails.
 2. **Gestion du contexte** : l'ASPP de DeepLab capture plusieurs échelles simultanément, ce qui aide à distinguer des classes visuellement proches (bâtiment vs ciel). MobileDet, avec ses convolutions depthwise, capture moins de contexte global, expliquant une légère chute sur les classes aux frontières diffuses.
 3. **Compatibilité avec les augmentations** : U-Net VGG16 et DeepLab exploitent pleinement la diversité photométrique générée par Albumentations (flous, météo, bruit), tandis que YOLOv9 simplifié réagit moins bien aux distorsions optiques et aux variations de luminosité car sa tête PANet reste sensible aux textures fines.
 4. **Optimisation** : l'entraînement SGD avec scheduler polynomial s'adapte mieux aux architectures profondes. Les modèles plus légers auraient pu bénéficier d'un AdamW avec *weight decay* ; cette piste est listée dans les travaux futurs.
 
-### 4.4. Analyse multi-critères
+### 4.5. Analyse multi-critères
 
 La synthèse suivante aide à choisir un modèle en fonction de contraintes spécifiques :
 
@@ -221,7 +232,7 @@ La synthèse suivante aide à choisir un modèle en fonction de contraintes spé
 | Haute fidélité visuelle (si VRAM OK)  | **U-Net VGG16**                         | Résultats solides mais coût mémoire élevé.                                |
 | Prototypage rapide / tests pipeline   | **U-Net mini**                          | Faible précision mais mise en place rapide.                               |
 
-### 4.5. Observations complémentaires
+### 4.6. Observations complémentaires
 
 - Les modèles lourds (DeepLab, U-Net VGG16) bénéficient pleinement des corruptions photométriques et météo isolées, réduisant l'overfit sans perturber la géométrie des objets fins.
 - Les architectures basées sur MobileNet montrent une bonne efficacité énergétique mais nécessitent un *fine-tuning* plus poussé pour rivaliser avec DeepLab.
@@ -259,7 +270,7 @@ Cette conception garantit que l'API renvoie des résultats prêts à afficher (P
 
 ### 5.3. AugmentationService
 
-L'aperçu des augmentations partage exactement la pipeline Bhuiya utilisée à l'entraînement :
+L'aperçu des augmentations partage exactement la pipeline d'augmentations météo/optique (inspirée de Bhuiya et al.) utilisée à l'entraînement :
 
 - Construction d'un `A.Compose([A.OneOf([...], p=1.0)])` où chaque transformateur correspond à une corruption décrite dans l'article (flous, bruit, météo, distorsion optique).
 - Conversion de l'image d'entrée en `numpy.ndarray`, application de la transformation tirée au sort (`generate`, `samples` fois) ou de chaque transformation déterministe (`gallery`) et emballage des résultats dans une liste d'`AugmentedImage` (nom + image).
